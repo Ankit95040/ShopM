@@ -13,16 +13,18 @@ import {
   MapPin,
   Trash2,
   FileText,
+  Pencil,
   X,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import {
   addDebtAction,
   addPaymentAction,
+  editTransactionAction,
   softDeleteTransactionAction,
   restoreTransactionAction,
 } from "@/server/actions/transaction.actions";
-import { uploadBillImage, getBillImageSignedUrl } from "@/server/actions/upload.actions";
+import { uploadBillImage, getBillImageSignedUrl, removeBillImage } from "@/server/actions/upload.actions";
 import { PaymentMethod } from "@prisma/client";
 import { useTranslation } from "@/lib/i18n";
 import { ConfirmModal } from "@/components/shared/ConfirmModal";
@@ -93,6 +95,21 @@ export function CustomerLedgerView({
   const [debtImageFile, setDebtImageFile] = useState<File | null>(null);
   const [debtImagePreview, setDebtImagePreview] = useState<string | null>(null);
   const debtFileInputRef = useRef<HTMLInputElement>(null);
+  const debtCameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Edit Transaction State
+  const [editingTx, setEditingTx] = useState<TransactionItem | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editBillNo, setEditBillNo] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editPaymentMethod, setEditPaymentMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
+  const [editChangeReason, setEditChangeReason] = useState("");
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+  const [editRemoveImage, setEditRemoveImage] = useState(false);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+  const editCameraInputRef = useRef<HTMLInputElement>(null);
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
 
   // Add Payment Form State
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -201,6 +218,9 @@ export function CustomerLedgerView({
     if (debtFileInputRef.current) {
       debtFileInputRef.current.value = "";
     }
+    if (debtCameraInputRef.current) {
+      debtCameraInputRef.current.value = "";
+    }
   };
 
   // Handle viewing bill image from transaction
@@ -220,6 +240,139 @@ export function CustomerLedgerView({
       // Legacy: use billImageUrl directly
       setSelectedImage(tx.billImageUrl);
     }
+  };
+
+  // Handle edit file selection
+  const handleEditFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Invalid file type. Only JPEG, PNG, and WebP images are allowed.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File too large. Maximum size is 5MB.");
+      return;
+    }
+    setEditImageFile(file);
+    setEditRemoveImage(false);
+    if (editImagePreview) URL.revokeObjectURL(editImagePreview);
+    const previewUrl = URL.createObjectURL(file);
+    setEditImagePreview(previewUrl);
+  };
+
+  const handleRemoveEditImage = () => {
+    setEditImageFile(null);
+    if (editImagePreview) {
+      URL.revokeObjectURL(editImagePreview);
+      setEditImagePreview(null);
+    }
+    if (editFileInputRef.current) editFileInputRef.current.value = "";
+    if (editCameraInputRef.current) editCameraInputRef.current.value = "";
+  };
+
+  const openEditModal = (tx: TransactionItem) => {
+    setEditingTx(tx);
+    setEditAmount(String(tx.amount));
+    setEditBillNo(tx.billNumber || "");
+    setEditDesc(tx.description || "");
+    setEditPaymentMethod((tx.paymentMethod as PaymentMethod) || PaymentMethod.CASH);
+    setEditChangeReason("");
+    setEditImageFile(null);
+    setEditRemoveImage(false);
+    if (editImagePreview) {
+      URL.revokeObjectURL(editImagePreview);
+      setEditImagePreview(null);
+    }
+    if (editFileInputRef.current) editFileInputRef.current.value = "";
+    if (editCameraInputRef.current) editCameraInputRef.current.value = "";
+  };
+
+  const closeEditModal = () => {
+    setEditingTx(null);
+    handleRemoveEditImage();
+    setEditRemoveImage(false);
+    setEditChangeReason("");
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTx) return;
+    const amt = parseFloat(editAmount);
+    if (isNaN(amt) || amt <= 0) {
+      toast.error("Amount must be greater than zero");
+      return;
+    }
+    if (!editChangeReason.trim()) {
+      toast.error("Change reason is required for audit");
+      return;
+    }
+    setIsEditSubmitting(true);
+    const res = await editTransactionAction({
+      transactionId: editingTx.id,
+      amount: amt,
+      billNumber: editingTx.type === "DEBT" ? editBillNo : undefined,
+      paymentMethod: editingTx.type === "PAYMENT_RECEIVED" ? editPaymentMethod : undefined,
+      description: editDesc || undefined,
+      changeReason: editChangeReason.trim(),
+    });
+    if (!res.success || !res.transaction) {
+      toast.error(res.error || "Failed to edit transaction");
+      setIsEditSubmitting(false);
+      return;
+    }
+    let finalBillImageKey: string | null | undefined = editingTx.billImageKey;
+    // Handle image removal or replacement via R2 pipeline
+    if (editRemoveImage && !editImageFile && editingTx.billImageKey) {
+      const rm = await removeBillImage({ transactionId: editingTx.id, customerId: customer.id });
+      if (!rm.success) {
+        toast.error(rm.error || "Failed to remove bill image");
+      } else {
+        finalBillImageKey = null;
+      }
+    } else if (editImageFile) {
+      const formData = new FormData();
+      formData.append("transactionId", editingTx.id);
+      formData.append("customerId", customer.id);
+      formData.append("file", editImageFile);
+      const up = await uploadBillImage(formData);
+      if (!up.success) {
+        toast.error(up.error || "Failed to upload bill image");
+      } else {
+        finalBillImageKey = up.billImageKey || null;
+      }
+    }
+    const updated: TransactionItem = {
+      ...editingTx,
+      amount: amt,
+      billNumber: editingTx.type === "DEBT" ? editBillNo || null : editingTx.billNumber,
+      paymentMethod: editingTx.type === "PAYMENT_RECEIVED" ? editPaymentMethod : editingTx.paymentMethod,
+      description: editDesc || null,
+      billImageKey: finalBillImageKey ?? null,
+      billImageUrl: finalBillImageKey ? null : editingTx.billImageUrl,
+    };
+    setData((prev) => {
+      const replace = (arr: TransactionItem[]) => arr.map((t) => (t.id === editingTx.id ? updated : t));
+      const oldAmt = editingTx.amount;
+      const diff = amt - oldAmt;
+      const isDebt = editingTx.type === "DEBT";
+      return {
+        ...prev,
+        summary: {
+          ...prev.summary,
+          totalDebt: isDebt ? prev.summary.totalDebt + diff : prev.summary.totalDebt,
+          totalReceived: !isDebt ? prev.summary.totalReceived + diff : prev.summary.totalReceived,
+          outstandingBalance: isDebt ? prev.summary.outstandingBalance + diff : prev.summary.outstandingBalance - diff,
+        },
+        debtTransactions: isDebt ? replace(prev.debtTransactions) : prev.debtTransactions,
+        paymentTransactions: !isDebt ? replace(prev.paymentTransactions) : prev.paymentTransactions,
+        allTransactions: replace(prev.allTransactions),
+      };
+    });
+    toast.success("Transaction updated");
+    closeEditModal();
+    setIsEditSubmitting(false);
   };
 
   // Handle Add Debt
@@ -664,19 +817,10 @@ export function CustomerLedgerView({
                       <span>{t("addedBy")}: <strong className="text-slate-700">{txItem.createdByName}</strong></span>
                     </div>
 
-                    {txItem.billImageKey && (
+                    {(txItem.billImageKey || txItem.billImageUrl) && (
                       <button
                         onClick={() => handleViewBillImage(txItem)}
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition mt-1"
-                        title={t("viewAttachedBillPhoto")}
-                      >
-                        <FileText className="h-4 w-4" />
-                      </button>
-                    )}
-                    {!txItem.billImageKey && txItem.billImageUrl && (
-                      <button
-                        onClick={() => handleViewBillImage(txItem)}
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition mt-1"
+                        className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] h-11 w-11 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition mt-1"
                         title={t("viewAttachedBillPhoto")}
                       >
                         <FileText className="h-4 w-4" />
@@ -684,7 +828,7 @@ export function CustomerLedgerView({
                     )}
                   </div>
 
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-2">
                     <div className="text-right">
                       <div className="text-base font-black text-red-600">
                         {formatCurrency(txItem.amount)}
@@ -696,9 +840,18 @@ export function CustomerLedgerView({
                       )}
                     </div>
                     <button
+                      onClick={() => openEditModal(txItem)}
+                      className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition shrink-0"
+                      title={t("edit")}
+                      aria-label="Edit"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
                       onClick={() => setDeleteTxTarget(txItem)}
-                      className="rounded-lg p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-600 transition shrink-0"
+                      className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-300 hover:bg-red-50 hover:text-red-600 transition shrink-0"
                       title="Delete Bill"
+                      aria-label="Delete"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -746,9 +899,18 @@ export function CustomerLedgerView({
                       <span>•</span>
                       <span>{t("addedBy")}: <strong className="text-slate-700">{txItem.createdByName}</strong></span>
                     </div>
+                    {(txItem.billImageKey || txItem.billImageUrl) && (
+                      <button
+                        onClick={() => handleViewBillImage(txItem)}
+                        className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] h-11 w-11 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition mt-1"
+                        title={t("viewAttachedBillPhoto")}
+                      >
+                        <FileText className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
 
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-2">
                     <div className="text-right">
                       <div className="text-base font-black text-emerald-600">
                         {formatCurrency(txItem.amount)}
@@ -760,9 +922,18 @@ export function CustomerLedgerView({
                       )}
                     </div>
                     <button
+                      onClick={() => openEditModal(txItem)}
+                      className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition shrink-0"
+                      title={t("edit")}
+                      aria-label="Edit"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
                       onClick={() => setDeleteTxTarget(txItem)}
-                      className="rounded-lg p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-600 transition shrink-0"
+                      className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-300 hover:bg-red-50 hover:text-red-600 transition shrink-0"
                       title="Delete Payment"
+                      aria-label="Delete"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -822,12 +993,36 @@ export function CustomerLedgerView({
 
               <div>
                 <label className="text-xs font-bold text-slate-700">{t("debtImageLabel")}</label>
+                <div className="mt-1 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => debtCameraInputRef.current?.click()}
+                    className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 transition min-h-[44px]"
+                  >
+                    📷 {t("takePhoto")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => debtFileInputRef.current?.click()}
+                    className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 transition min-h-[44px]"
+                  >
+                    🖼️ {t("uploadFromGallery")}
+                  </button>
+                </div>
+                <input
+                  type="file"
+                  ref={debtCameraInputRef}
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
                 <input
                   type="file"
                   ref={debtFileInputRef}
                   accept="image/jpeg,image/png,image/webp"
                   onChange={handleFileSelect}
-                  className="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                  className="hidden"
                 />
                 {/* Image Preview */}
                 {debtImagePreview && (
@@ -953,6 +1148,135 @@ export function CustomerLedgerView({
                   className="w-2/3 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
                 >
                   {isSubmitting ? t("loading") : t("addPaymentSubmitBtn")}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT TRANSACTION MODAL */}
+      {editingTx && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold text-slate-900">
+              {editingTx.type === "DEBT"
+                ? t("addDebtModalTitle", { name: customer.name })
+                : t("addPaymentModalTitle", { name: customer.name })}{" "}
+              <span className="text-xs font-normal text-slate-500">— {t("edit")}</span>
+            </h3>
+            <form onSubmit={handleEditSubmit} className="mt-4 space-y-3.5">
+              <div>
+                <label className="text-xs font-bold text-slate-700">
+                  {editingTx.type === "DEBT" ? t("debtAmountLabel") : t("paymentAmountLabel")} *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                  className={`mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-base font-black focus:border-slate-900 focus:outline-none ${editingTx.type === "DEBT" ? "text-red-600" : "text-emerald-600"}`}
+                />
+              </div>
+              {editingTx.type === "DEBT" ? (
+                <div>
+                  <label className="text-xs font-bold text-slate-700">{t("debtBillNoLabel")}</label>
+                  <input
+                    type="text"
+                    placeholder={t("debtBillNoPlaceholder")}
+                    value={editBillNo}
+                    onChange={(e) => setEditBillNo(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none uppercase font-mono"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="text-xs font-bold text-slate-700">{t("paymentMethodLabel")} *</label>
+                  <select
+                    value={editPaymentMethod}
+                    onChange={(e) => setEditPaymentMethod(e.target.value as PaymentMethod)}
+                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:border-slate-900 focus:outline-none"
+                  >
+                    <option value={PaymentMethod.CASH}>{t("paymentMethodCash")}</option>
+                    <option value={PaymentMethod.UPI}>{t("paymentMethodUPI")}</option>
+                    <option value={PaymentMethod.BANK_TRANSFER}>{t("paymentMethodBank")}</option>
+                    <option value={PaymentMethod.OTHER}>{t("paymentMethodOther")}</option>
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="text-xs font-bold text-slate-700">{editingTx.type === "DEBT" ? t("debtDescLabel") : t("paymentNotesLabel")}</label>
+                <input
+                  type="text"
+                  placeholder={editingTx.type === "DEBT" ? t("debtDescPlaceholder") : t("paymentNotesPlaceholder")}
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">{t("billImageLabel")}</label>
+                <div className="mt-1 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => editCameraInputRef.current?.click()}
+                    className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 transition min-h-[44px]"
+                  >
+                    📷 {t("takePhoto")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => editFileInputRef.current?.click()}
+                    className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 transition min-h-[44px]"
+                  >
+                    🖼️ {t("uploadFromGallery")}
+                  </button>
+                </div>
+                <input type="file" ref={editCameraInputRef} accept="image/*" capture="environment" onChange={handleEditFileSelect} className="hidden" />
+                <input type="file" ref={editFileInputRef} accept="image/jpeg,image/png,image/webp" onChange={handleEditFileSelect} className="hidden" />
+                {editImagePreview ? (
+                  <div className="mt-2 relative inline-block">
+                    <Image src={editImagePreview} alt="Bill preview" width={200} height={150} className="rounded-xl border border-slate-200 object-cover" />
+                    <button type="button" onClick={handleRemoveEditImage} className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white shadow-md hover:bg-red-600 transition">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ) : editingTx.billImageKey && !editRemoveImage ? (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-[11px] text-slate-500">{t("viewAttachedBillPhoto")} ✓</span>
+                    <button type="button" onClick={() => handleViewBillImage(editingTx)} className="text-xs font-bold text-sky-600 hover:underline">
+                      {t("viewBillImage")}
+                    </button>
+                    <button type="button" onClick={() => setEditRemoveImage(true)} className="text-xs font-bold text-red-600 hover:underline">
+                      {t("delete")}
+                    </button>
+                  </div>
+                ) : editRemoveImage ? (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-[11px] text-slate-400">Image will be removed on save</span>
+                    <button type="button" onClick={() => setEditRemoveImage(false)} className="text-xs font-bold text-sky-600 hover:underline">Undo</button>
+                  </div>
+                ) : null}
+                <p className="text-[10px] text-slate-400 mt-1">{t("billImageHint")}</p>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Change reason *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Reason for editing"
+                  value={editChangeReason}
+                  onChange={(e) => setEditChangeReason(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={closeEditModal} className="w-1/3 rounded-xl border border-slate-300 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 min-h-[44px]">
+                  {t("cancel")}
+                </button>
+                <button type="submit" disabled={isEditSubmitting} className="w-2/3 rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-800 disabled:opacity-50 min-h-[44px]">
+                  {isEditSubmitting ? t("loading") : t("save")}
                 </button>
               </div>
             </form>

@@ -164,10 +164,33 @@ export const translations = {
     // Bill Image
     billImageLabel: "Bill Image (Optional)",
     billImageHint: "JPEG, PNG, or WebP. Max 5MB. Take a photo or choose from gallery.",
+    takePhoto: "Take Photo",
+    uploadFromGallery: "Upload from Gallery",
     billImageUploadSuccess: "Bill image uploaded successfully",
     billImageUploadFailed: "Failed to upload bill image",
     billImageRemoveSuccess: "Bill image removed",
     billImageRemoveFailed: "Failed to remove bill image",
+
+    // Help & Feedback
+    helpAndFeedback: "Help & Feedback",
+    feedbackPrompt: "How can we improve ShopM?",
+    feedbackType: "Type",
+    feedbackFeatureRequest: "Feature Request",
+    feedbackBug: "Bug / Issue",
+    feedbackGeneral: "General Feedback",
+    feedbackMessage: "Message",
+    feedbackPlaceholder: "Describe your feedback...",
+    feedbackSubmit: "Submit Feedback",
+    feedbackSubmitting: "Submitting...",
+    feedbackEmptyMessage: "Please enter a message",
+    feedbackSuccess: "Feedback submitted successfully",
+    feedbackError: "Failed to submit feedback",
+    feedbackThankYou: "Thank you for your feedback!",
+    feedbackReceived: "We have received your message.",
+
+    // Footer
+    footerVersion: "v1.0.0",
+    footerRights: "All rights reserved",
 
     // Add Payment Modal
     addPaymentModalTitle: "Add Payment Received from {name}",
@@ -501,10 +524,33 @@ export const translations = {
     // Bill Image
     billImageLabel: "बिल फोटो (ऐच्छिक)",
     billImageHint: "JPEG, PNG, या WebP। अधिकतम 5MB। फोटो खींचें या गैलरी से चुनें।",
+    takePhoto: "फ़ोटो लें",
+    uploadFromGallery: "गैलरी से अपलोड करें",
     billImageUploadSuccess: "बिल फोटो सफलतापूर्वक अपलोड हो गई",
     billImageUploadFailed: "बिल फोटो अपलोड करने में विफल",
     billImageRemoveSuccess: "बिल फोटो हटा दी गई",
     billImageRemoveFailed: "बिल फोटो हटाने में विफल",
+
+    // Help & Feedback
+    helpAndFeedback: "सहायता और प्रतिक्रिया",
+    feedbackPrompt: "हम ShopM को कैसे बेहतर बना सकते हैं?",
+    feedbackType: "प्रकार",
+    feedbackFeatureRequest: "नई सुविधा अनुरोध",
+    feedbackBug: "बग / समस्या",
+    feedbackGeneral: "सामान्य प्रतिक्रिया",
+    feedbackMessage: "संदेश",
+    feedbackPlaceholder: "अपनी प्रतिक्रिया लिखें...",
+    feedbackSubmit: "प्रतिक्रिया भेजें",
+    feedbackSubmitting: "भेजा जा रहा है...",
+    feedbackEmptyMessage: "कृपया संदेश दर्ज करें",
+    feedbackSuccess: "प्रतिक्रिया सफलतापूर्वक भेजी गई",
+    feedbackError: "प्रतिक्रिया भेजने में विफल",
+    feedbackThankYou: "आपकी प्रतिक्रिया के लिए धन्यवाद!",
+    feedbackReceived: "हमें आपका संदेश प्राप्त हुआ है।",
+
+    // Footer
+    footerVersion: "v1.0.0",
+    footerRights: "सर्वाधिकार सुरक्षित",
 
     // Add Payment Modal
     addPaymentModalTitle: "{name} से प्राप्त भुगतान दर्ज करें",

@@ -1,6 +1,7 @@
 import { db } from "@/server/db";
 import { DashboardView, DashboardMetrics } from "@/components/dashboard/DashboardView";
 import { getCurrentSession } from "@/server/auth";
+import { HomepageShell } from "@/components/shared/HomepageShell";
 
 export const dynamic = "force-dynamic";
 
@@ -137,5 +138,9 @@ export default async function DashboardPage() {
     allMovements,
   };
 
-  return <DashboardView data={dashboardData} />;
+  return (
+    <HomepageShell>
+      <DashboardView data={dashboardData} />
+    </HomepageShell>
+  );
 }

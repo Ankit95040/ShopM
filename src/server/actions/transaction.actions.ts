@@ -327,7 +327,62 @@ export async function restoreTransactionAction(transactionId: string) {
     });
     if (!tx) return { success: false, error: "Transaction not found or not deleted" };
 
+    const customer = await db.customer.findFirst({
+      where: { id: tx.customerId, shopId: session.shopId },
+      select: { id: true, isDeleted: true, locationId: true },
+    });
+    if (!customer) return { success: false, error: "Parent customer not found" };
+
+    const location = await db.location.findFirst({
+      where: { id: customer.locationId, shopId: session.shopId },
+      select: { id: true, isDeleted: true },
+    });
+    if (!location) return { success: false, error: "Parent location not found" };
+
+    const needsLocationRestore = location.isDeleted;
+    const needsCustomerRestore = customer.isDeleted;
+
     await db.$transaction(async (prisma) => {
+      if (needsLocationRestore) {
+        await prisma.location.update({
+          where: { id: customer.locationId },
+          data: { isDeleted: false, deletedAt: null },
+        });
+
+        await prisma.auditLog.create({
+          data: {
+            shopId: session.shopId,
+            userId: session.userId,
+            action: AuditAction.RESTORE,
+            entityType: "LOCATION",
+            entityId: customer.locationId,
+            previousValue: { isDeleted: true },
+            newValue: { isDeleted: false },
+            changeReason: "Location restored as ancestor of restored transaction",
+          },
+        });
+      }
+
+      if (needsCustomerRestore) {
+        await prisma.customer.update({
+          where: { id: tx.customerId },
+          data: { isDeleted: false, deletedAt: null },
+        });
+
+        await prisma.auditLog.create({
+          data: {
+            shopId: session.shopId,
+            userId: session.userId,
+            action: AuditAction.RESTORE,
+            entityType: "CUSTOMER",
+            entityId: tx.customerId,
+            previousValue: { isDeleted: true },
+            newValue: { isDeleted: false },
+            changeReason: "Customer restored as parent of restored transaction",
+          },
+        });
+      }
+
       await prisma.transaction.update({
         where: { id: transactionId },
         data: {
@@ -347,24 +402,26 @@ export async function restoreTransactionAction(transactionId: string) {
           transactionId,
           previousValue: { isDeleted: true },
           newValue: { isDeleted: false },
-          changeReason: "Transaction restored by user",
+          changeReason: [
+            needsLocationRestore ? "location restored" : null,
+            needsCustomerRestore ? "customer restored" : null,
+            "transaction restored",
+          ]
+            .filter(Boolean)
+            .join("; "),
         },
       });
     });
 
-    const cust = await db.customer.findUnique({
-      where: { id: tx.customerId },
-      select: { locationId: true },
-    });
-
-    if (cust) {
-      revalidatePath(`/billing/${cust.locationId}/customers/${tx.customerId}`);
-      revalidatePath(`/billing/${cust.locationId}`);
+    if (customer) {
+      revalidatePath(`/billing/${customer.locationId}/customers/${tx.customerId}`);
+      revalidatePath(`/billing/${customer.locationId}`);
     }
     revalidatePath("/billing");
     revalidatePath("/");
     revalidatePath("/reports");
     revalidatePath("/audit-logs");
+    revalidatePath("/recycle-bin");
 
     return { success: true };
   } catch (error: unknown) {

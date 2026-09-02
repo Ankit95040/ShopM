@@ -269,7 +269,35 @@ export async function restoreCustomerAction(customerId: string) {
     });
     if (!customer) return { success: false, error: "Customer not found or not deleted" };
 
+    const location = await db.location.findFirst({
+      where: { id: customer.locationId, shopId: session.shopId },
+      select: { id: true, isDeleted: true },
+    });
+    if (!location) return { success: false, error: "Parent location not found" };
+
+    const needsLocationRestore = location.isDeleted;
+
     const tx = await db.$transaction(async (prisma) => {
+      if (needsLocationRestore) {
+        await prisma.location.update({
+          where: { id: customer.locationId },
+          data: { isDeleted: false, deletedAt: null },
+        });
+
+        await prisma.auditLog.create({
+          data: {
+            shopId: session.shopId,
+            userId: session.userId,
+            action: AuditAction.RESTORE,
+            entityType: "LOCATION",
+            entityId: customer.locationId,
+            previousValue: { isDeleted: true },
+            newValue: { isDeleted: false },
+            changeReason: "Location restored as parent of restored customer",
+          },
+        });
+      }
+
       const updated = await prisma.customer.update({
         where: { id: customerId },
         data: {
@@ -287,7 +315,9 @@ export async function restoreCustomerAction(customerId: string) {
           entityId: customerId,
           previousValue: { isDeleted: true },
           newValue: { isDeleted: false },
-          changeReason: "Customer restored by user",
+          changeReason: needsLocationRestore
+            ? "Customer restored; parent location was also restored"
+            : "Customer restored by user",
         },
       });
 

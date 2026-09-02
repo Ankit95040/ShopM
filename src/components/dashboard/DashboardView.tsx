@@ -253,10 +253,11 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
                       {tx.billImageKey && (
                         <button
                           onClick={() => handleViewBillImage(tx)}
-                          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-sky-50 text-sky-600 hover:bg-sky-100 transition"
+                          className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] h-11 w-11 rounded-md bg-sky-50 text-sky-600 hover:bg-sky-100 transition shrink-0"
                           title={t("viewBillImage")}
+                          aria-label={t("viewBillImage")}
                         >
-                          <FileText className="h-3 w-3" />
+                          <FileText className="h-3.5 w-3.5" />
                         </button>
                       )}
                     </div>
@@ -372,8 +373,9 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
                       {tx.billImageKey && (
                         <button
                           onClick={() => handleViewBillImage(tx)}
-                          className="inline-flex items-center justify-center h-7 w-7 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition"
+                          className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] h-11 w-11 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition shrink-0"
                           title={t("viewBillImage")}
+                          aria-label={t("viewBillImage")}
                         >
                           <FileText className="h-3.5 w-3.5" />
                         </button>

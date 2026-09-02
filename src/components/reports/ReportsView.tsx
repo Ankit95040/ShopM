@@ -411,8 +411,9 @@ export function ReportsView({
                         {tx.billImageKey && (
                           <button
                             onClick={() => handleViewBillImage(tx)}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition"
+                            className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition"
                             title={t("viewBillImage")}
+                            aria-label={t("viewBillImage")}
                           >
                             <FileText className="h-3.5 w-3.5" />
                           </button>
@@ -456,8 +457,9 @@ export function ReportsView({
                     {tx.billImageKey && (
                       <button
                         onClick={() => handleViewBillImage(tx)}
-                        className="flex h-8 items-center gap-1 rounded-lg bg-sky-50 px-2.5 text-[10px] font-bold text-sky-600 hover:bg-sky-100 transition"
+                        className="flex min-h-[44px] items-center gap-1 rounded-lg bg-sky-50 px-2.5 text-[10px] font-bold text-sky-600 hover:bg-sky-100 transition"
                         title={t("viewBillImage")}
+                        aria-label={t("viewBillImage")}
                       >
                         <FileText className="h-3 w-3" />
                         {t("viewBillImage")}
