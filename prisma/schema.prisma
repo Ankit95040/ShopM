@@ -12,20 +12,46 @@ generator client {
 
 enum UserRole {
   OWNER
+  MANAGER
   EMPLOYEE
 }
 
-model User {
-  id           String    @id @default(cuid())
-  name         String
-  email        String    @unique
-  phone        String?   @unique
-  passwordHash String
-  role         UserRole  @default(EMPLOYEE)
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+model Shop {
+  id          String   @id @default(cuid())
+  shopCode    String   @unique
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
+  members             ShopMember[]
+  sessions            AuthSession[]
+  locations           Location[]
+  customers           Customer[]
+  transactions        Transaction[]
+  inventoryCategories InventoryCategory[]
+  inventoryItems      InventoryItem[]
+  stockMovements      StockMovement[]
+  auditLogs           AuditLog[]
+
+  @@index([shopCode])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String?   @unique
+  phone         String?   @unique
+  passwordHash  String
+  emailVerified DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  memberships         ShopMember[]
+  sessions            AuthSession[]
+  otpTokens           OtpToken[]
   locationsCreated    Location[]      @relation("LocationCreator")
   customersCreated    Customer[]      @relation("CustomerCreator")
   transactionsCreated Transaction[]   @relation("TransactionCreator")
@@ -37,12 +63,70 @@ model User {
   @@index([email])
 }
 
+model ShopMember {
+  id        String   @id @default(cuid())
+  shopId    String
+  userId    String
+  loginId   String
+  role      UserRole @default(EMPLOYEE)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions  AuthSession[]
+
+  @@unique([shopId, loginId])
+  @@unique([shopId, userId])
+  @@index([userId])
+}
+
+model AuthSession {
+  id           String   @id @default(cuid())
+  tokenHash    String   @unique
+  userId       String
+  shopId       String
+  shopMemberId String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shop         Shop       @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shopMember   ShopMember @relation(fields: [shopMemberId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([shopId])
+  @@index([expiresAt])
+}
+
+model OtpToken {
+  id           String   @id @default(cuid())
+  userId       String
+  email        String
+  otpHash      String
+  purpose      String   @default("forgot-password")
+  attempts     Int      @default(0)
+  maxAttempts  Int      @default(5)
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([email])
+  @@index([expiresAt])
+}
+
 // ---------------------------------------------------------
 // 2. LOCATIONS (SHOPS / WAREHOUSES)
 // ---------------------------------------------------------
 
 model Location {
   id          String          @id @default(cuid())
+  shopId      String
   name        String          // e.g. "Meerut Shop", "Delhi Shop", "Warehouse"
   description String?
   isDeleted   Boolean         @default(false)
@@ -51,12 +135,13 @@ model Location {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
+  shop        Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
   createdBy   User            @relation("LocationCreator", fields: [createdById], references: [id])
   customers   Customer[]
   inventory   InventoryItem[]
 
-  @@index([name])
-  @@index([isDeleted])
+  @@index([shopId, isDeleted])
+  @@index([shopId, name])
 }
 
 // ---------------------------------------------------------
@@ -65,6 +150,7 @@ model Location {
 
 model Customer {
   id          String        @id @default(cuid())
+  shopId      String
   locationId  String
   name        String
   phone       String
@@ -75,13 +161,15 @@ model Customer {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
+  shop         Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
   location     Location      @relation(fields: [locationId], references: [id], onDelete: Cascade)
   createdBy    User          @relation("CustomerCreator", fields: [createdById], references: [id])
   transactions Transaction[]
 
+  @@index([shopId, isDeleted])
   @@index([locationId, isDeleted])
-  @@index([phone])
-  @@index([name])
+  @@index([shopId, phone])
+  @@index([shopId, name])
 }
 
 // ---------------------------------------------------------
@@ -102,14 +190,16 @@ enum PaymentMethod {
 
 model Transaction {
   id                 String          @id @default(cuid())
+  shopId             String
   customerId         String
   type               TransactionType
   amount             Decimal         @db.Decimal(14, 2)
   billNumber         String?         // Optional reference number
   paymentMethod      PaymentMethod?
   description        String?         // Notes
-  billImageUrl       String?         // Cloudinary/Supabase asset URL
-  billImagePublicId  String?         // Storage file handle for deletion/replacement
+  billImageUrl       String?         // Cloudinary/Supabase asset URL (legacy)
+  billImagePublicId  String?         // Storage file handle for deletion/replacement (legacy)
+  billImageKey       String?         // R2 object key: transactions/{shopId}/{customerId}/{txId}.{ext}
   transactionDate    DateTime        @default(now())
 
   isDeleted          Boolean         @default(false)
@@ -121,14 +211,16 @@ model Transaction {
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
+  shop               Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
   customer           Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
   createdBy          User            @relation("TransactionCreator", fields: [createdById], references: [id])
   updatedBy          User?           @relation("TransactionEditor", fields: [updatedById], references: [id])
   auditLogs          AuditLog[]
 
+  @@index([shopId, isDeleted, transactionDate])
   @@index([customerId, isDeleted, transactionDate])
-  @@index([type])
-  @@index([billNumber])
+  @@index([shopId, type])
+  @@index([shopId, billNumber])
 }
 
 // ---------------------------------------------------------
@@ -137,18 +229,22 @@ model Transaction {
 
 model InventoryCategory {
   id          String          @id @default(cuid())
-  name        String          @unique // e.g. Cement, Steel, Electrical, Plumbing, Hardware
+  shopId      String
+  name        String          // e.g. Cement, Steel, Electrical, Plumbing, Hardware
   description String?
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
+  shop        Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
   items       InventoryItem[]
 
-  @@index([name])
+  @@unique([shopId, name])
+  @@index([shopId, name])
 }
 
 model InventoryItem {
   id                String             @id @default(cuid())
+  shopId            String
   locationId        String?
   categoryId        String
   name              String             // e.g. "UltraTech 50kg", "Wire 1.5mm"
@@ -167,13 +263,15 @@ model InventoryItem {
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
+  shop              Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
   category          InventoryCategory  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   location          Location?          @relation(fields: [locationId], references: [id], onDelete: SetNull)
   createdBy         User               @relation("InventoryItemCreator", fields: [createdById], references: [id])
   movements         StockMovement[]
 
-  @@index([categoryId, isDeleted])
-  @@index([name])
+  @@index([shopId, isDeleted])
+  @@index([shopId, categoryId, isDeleted])
+  @@index([shopId, name])
   @@index([sku])
 }
 
@@ -193,6 +291,7 @@ enum StockRemovalReason {
 
 model StockMovement {
   id            String              @id @default(cuid())
+  shopId        String
   itemId        String
   type          StockMovementType
   removalReason StockRemovalReason?
@@ -207,9 +306,11 @@ model StockMovement {
   createdById   String
   createdAt     DateTime            @default(now())
 
+  shop          Shop                @relation(fields: [shopId], references: [id], onDelete: Cascade)
   item          InventoryItem       @relation(fields: [itemId], references: [id], onDelete: Cascade)
   createdBy     User                @relation("StockMovementCreator", fields: [createdById], references: [id])
 
+  @@index([shopId, movementDate])
   @@index([itemId, movementDate])
 }
 
@@ -227,6 +328,7 @@ enum AuditAction {
 
 model AuditLog {
   id            String       @id @default(cuid())
+  shopId        String
   userId        String
   action        AuditAction
   entityType    String       // "TRANSACTION", "CUSTOMER", "LOCATION", "INVENTORY"
@@ -238,9 +340,11 @@ model AuditLog {
   ipAddress     String?
   createdAt     DateTime     @default(now())
 
+  shop          Shop         @relation(fields: [shopId], references: [id], onDelete: Cascade)
   user          User         @relation(fields: [userId], references: [id])
   transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
 
+  @@index([shopId, createdAt])
   @@index([entityType, entityId])
   @@index([userId])
   @@index([createdAt])

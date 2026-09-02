@@ -1,7 +1,7 @@
-import { db } from "@/server/db";
 import { getCustomersByLocationAction } from "@/server/actions/customer.actions";
 import { CustomerTable } from "@/components/billing/CustomerTable";
-import { notFound } from "next/navigation";
+import { db } from "@/server/db";
+import { getCurrentSession } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -11,16 +11,14 @@ export default async function LocationCustomersPage({
   params: Promise<{ locationId: string }>;
 }) {
   const { locationId } = await params;
+  const session = await getCurrentSession();
+  if (!session) return null;
 
   let location = null;
-  let userId = "usr_default_01";
-
   try {
     location = await db.location.findUnique({
-      where: { id: locationId, isDeleted: false },
+      where: { id: locationId, shopId: session.shopId, isDeleted: false },
     });
-    const user = await db.user.findFirst();
-    if (user) userId = user.id;
   } catch (error) {
     console.error("Failed to fetch location:", error);
   }
@@ -43,7 +41,6 @@ export default async function LocationCustomersPage({
         initialCustomers={customers}
         locationId={locationId}
         locationName={location.name}
-        userId={userId}
       />
     </div>
   );

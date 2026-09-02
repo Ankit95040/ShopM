@@ -1,9 +1,6 @@
 import {
   PrismaClient,
   UserRole,
-  TransactionType,
-  PaymentMethod,
-  StockMovementType,
 } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
@@ -17,234 +14,148 @@ const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
+async function createOwner({
+  name,
+  email,
+  phone,
+  password,
+}: {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+}) {
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  return prisma.user.upsert({
+    where: { email },
+    update: {
+      name,
+      phone,
+      passwordHash,
+      isActive: true,
+    },
+    create: {
+      name,
+      email,
+      phone,
+      passwordHash,
+      isActive: true,
+    },
+  });
+}
+
 async function main() {
-  console.log("🌱 Seeding ShopM master data according to exact business requirements...");
+  console.log("=== ShopM Database Reset & Auth Setup ===");
+  console.log("");
 
-  // 1. Create Default Users (Owner & Employee)
-  const passwordHash = await bcrypt.hash("Password@123", 10);
+  // Step 1: Delete ALL business data (order matters for foreign keys)
+  console.log("Clearing all business data...");
 
-  const owner = await prisma.user.upsert({
-    where: { email: "owner@shopm.com" },
-    update: {},
+  await prisma.authSession.deleteMany();
+  await prisma.otpToken.deleteMany();
+  await prisma.auditLog.deleteMany();
+  await prisma.stockMovement.deleteMany();
+  await prisma.inventoryItem.deleteMany();
+  await prisma.inventoryCategory.deleteMany();
+  await prisma.transaction.deleteMany();
+  await prisma.customer.deleteMany();
+  await prisma.location.deleteMany();
+  await prisma.shopMember.deleteMany();
+
+  console.log("Business data cleared.");
+  console.log("");
+
+  // Step 2: Ensure shop exists (upsert - won't delete if already exists)
+  const shop = await prisma.shop.upsert({
+    where: { shopCode: "SHOPM-DEMO" },
+    update: {
+      name: "ShopM Demo Building Materials",
+      description: "Demo business account shared by three shop owners",
+      isActive: true,
+    },
     create: {
-      name: "Ankit Raj (Shop Owner)",
-      email: "owner@shopm.com",
-      phone: "+91 98765 43210",
-      passwordHash,
-      role: UserRole.OWNER,
+      shopCode: "SHOPM-DEMO",
+      name: "ShopM Demo Building Materials",
+      description: "Demo business account shared by three shop owners",
+      isActive: true,
     },
   });
 
-  const employee = await prisma.user.upsert({
-    where: { email: "employee@shopm.com" },
-    update: {},
-    create: {
-      name: "Rahul Verma (Staff)",
-      email: "employee@shopm.com",
-      phone: "+91 98111 22233",
-      passwordHash,
-      role: UserRole.EMPLOYEE,
-    },
+  // Step 3: Ensure owner accounts exist (upsert - won't delete if already exists)
+  const owner1 = await createOwner({
+    name: "Ankit Raj (Owner 1)",
+    email: "owner1@shopm.com",
+    phone: "+91 98765 43210",
+    password: "Owner1@ShopM",
   });
 
-  // 2. Create Locations / Branches
-  const locMeerut = await prisma.location.create({
-    data: {
-      name: "Meerut Shop",
-      description: "Main Wholesale & Retail Building Materials Outlet",
-      createdById: owner.id,
-    },
+  const owner2 = await createOwner({
+    name: "Priya Raj (Owner 2)",
+    email: "owner2@shopm.com",
+    phone: "+91 98111 22233",
+    password: "Owner2@ShopM",
   });
 
-  const locDelhi = await prisma.location.create({
-    data: {
-      name: "Delhi Shop",
-      description: "Commercial Hardware & Electrical Depot",
-      createdById: owner.id,
-    },
+  const owner3 = await createOwner({
+    name: "Rahul Raj (Owner 3)",
+    email: "owner3@shopm.com",
+    phone: "+91 98999 88877",
+    password: "Owner3@ShopM",
   });
 
-  const locWarehouse = await prisma.location.create({
-    data: {
-      name: "Central Warehouse",
-      description: "Bulk Cement & Steel Depot",
-      createdById: owner.id,
-    },
+  // Step 4: Ensure shop members exist (upsert - won't delete if already exists)
+  await prisma.shopMember.createMany({
+    data: [
+      { shopId: shop.id, userId: owner1.id, loginId: "owner1", role: UserRole.OWNER },
+      { shopId: shop.id, userId: owner2.id, loginId: "owner2", role: UserRole.OWNER },
+      { shopId: shop.id, userId: owner3.id, loginId: "owner3", role: UserRole.OWNER },
+    ],
+    skipDuplicates: true,
   });
 
-  // 3. Create Customers under Locations
-  const cust1 = await prisma.customer.create({
-    data: {
-      locationId: locMeerut.id,
-      name: "Rajesh Sharma (Contractor)",
-      phone: "9876543210",
-      address: "Plot 42, Civil Lines, Meerut",
-      createdById: owner.id,
-    },
-  });
+  // Step 5: Verify zero business data
+  const counts = await Promise.all([
+    prisma.location.count(),
+    prisma.customer.count(),
+    prisma.transaction.count(),
+    prisma.inventoryCategory.count(),
+    prisma.inventoryItem.count(),
+    prisma.stockMovement.count(),
+    prisma.auditLog.count(),
+  ]);
 
-  const cust2 = await prisma.customer.create({
-    data: {
-      locationId: locMeerut.id,
-      name: "Amit Builders",
-      phone: "9812345678",
-      address: "Near Metro Plaza, Meerut",
-      createdById: employee.id,
-    },
-  });
+  const [
+    locationCount,
+    customerCount,
+    transactionCount,
+    categoryCount,
+    itemCount,
+    movementCount,
+    auditCount,
+  ] = counts;
 
-  const cust3 = await prisma.customer.create({
-    data: {
-      locationId: locDelhi.id,
-      name: "Sunil Electricals",
-      phone: "9899988877",
-      address: "Shop 12, Chandni Chowk, Delhi",
-      createdById: owner.id,
-    },
-  });
-
-  // 4. Create Sample Transactions (DEBT & PAYMENTS)
-  // Customer 1: Rajesh Sharma
-  await prisma.transaction.create({
-    data: {
-      customerId: cust1.id,
-      type: TransactionType.DEBT,
-      amount: 5000,
-      billNumber: "BILL-102",
-      description: "UltraTech Cement 10 Bags",
-      createdById: employee.id,
-    },
-  });
-
-  await prisma.transaction.create({
-    data: {
-      customerId: cust1.id,
-      type: TransactionType.DEBT,
-      amount: 2000,
-      billNumber: "BILL-103",
-      description: "Binding wire & PVC Pipes",
-      createdById: employee.id,
-    },
-  });
-
-  await prisma.transaction.create({
-    data: {
-      customerId: cust1.id,
-      type: TransactionType.DEBT,
-      amount: 1500,
-      description: "Additional hardware purchase",
-      createdById: owner.id,
-    },
-  });
-
-  await prisma.transaction.create({
-    data: {
-      customerId: cust1.id,
-      type: TransactionType.PAYMENT_RECEIVED,
-      amount: 3000,
-      paymentMethod: PaymentMethod.CASH,
-      description: "Cash paid at counter",
-      createdById: employee.id,
-    },
-  });
-
-  await prisma.transaction.create({
-    data: {
-      customerId: cust1.id,
-      type: TransactionType.PAYMENT_RECEIVED,
-      amount: 2000,
-      paymentMethod: PaymentMethod.UPI,
-      description: "GPay / UPI Payment",
-      createdById: employee.id,
-    },
-  });
-
-  // 5. Create Inventory Categories
-  const catCement = await prisma.inventoryCategory.create({
-    data: { name: "Cement", description: "OPC & PPC Grade Cement Bags" },
-  });
-
-  const catSteel = await prisma.inventoryCategory.create({
-    data: { name: "Steel", description: "TMT Rebars and Structural Steel" },
-  });
-
-  const catElectrical = await prisma.inventoryCategory.create({
-    data: { name: "Electrical", description: "Wires, Switches, and Conduits" },
-  });
-
-  const catPlumbing = await prisma.inventoryCategory.create({
-    data: { name: "Plumbing", description: "CPVC & UPVC Pipes and Fittings" },
-  });
-
-  const catHardware = await prisma.inventoryCategory.create({
-    data: { name: "Hardware", description: "Nails, Fasteners, Tools" },
-  });
-
-  // 6. Create Inventory Items & Stock Movements
-  const itemCement1 = await prisma.inventoryItem.create({
-    data: {
-      categoryId: catCement.id,
-      locationId: locMeerut.id,
-      name: "UltraTech Cement 50kg",
-      sku: "CEM-ULT-50KG",
-      unit: "Bags",
-      currentStock: 150,
-      minStockThreshold: 20,
-      purchasePrice: 340,
-      sellingPrice: 380,
-      createdById: owner.id,
-    },
-  });
-
-  await prisma.stockMovement.create({
-    data: {
-      itemId: itemCement1.id,
-      type: StockMovementType.ADD_STOCK,
-      quantity: 150,
-      previousStock: 0,
-      newStock: 150,
-      supplier: "UltraTech Distributorship",
-      purchasePrice: 340,
-      notes: "Opening Stock Delivery",
-      createdById: owner.id,
-    },
-  });
-
-  const itemWire = await prisma.inventoryItem.create({
-    data: {
-      categoryId: catElectrical.id,
-      locationId: locDelhi.id,
-      name: "Havells Wire 1.5mm (90m Roll)",
-      sku: "ELE-HAV-1.5MM",
-      unit: "Rolls",
-      currentStock: 4, // Trigger Low Stock!
-      minStockThreshold: 10,
-      purchasePrice: 1250,
-      sellingPrice: 1550,
-      createdById: owner.id,
-    },
-  });
-
-  await prisma.stockMovement.create({
-    data: {
-      itemId: itemWire.id,
-      type: StockMovementType.ADD_STOCK,
-      quantity: 4,
-      previousStock: 0,
-      newStock: 4,
-      supplier: "Havells India Ltd",
-      purchasePrice: 1250,
-      notes: "Initial batch",
-      createdById: owner.id,
-    },
-  });
-
-  console.log("✅ Seed completed successfully!");
+  console.log("Authentication structure preserved:");
+  console.log("  Shop: SHOPM-DEMO");
+  console.log("  Owner 1: owner1 / Owner1@ShopM");
+  console.log("  Owner 2: owner2 / Owner2@ShopM");
+  console.log("  Owner 3: owner3 / Owner3@ShopM");
+  console.log("");
+  console.log("Business data verified (all must be 0):");
+  console.log(`  Locations: ${locationCount}`);
+  console.log(`  Customers: ${customerCount}`);
+  console.log(`  Transactions: ${transactionCount}`);
+  console.log(`  Inventory Categories: ${categoryCount}`);
+  console.log(`  Inventory Items: ${itemCount}`);
+  console.log(`  Stock Movements: ${movementCount}`);
+  console.log(`  Audit Logs: ${auditCount}`);
+  console.log("");
+  console.log("Database reset complete. You can now create fresh test data.");
 }
 
 main()
   .catch((e) => {
-    console.error("❌ Seed error:", e);
+    console.error("Seed error:", e);
     process.exit(1);
   })
   .finally(async () => {

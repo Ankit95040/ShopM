@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, History, TrendingUp, TrendingDown, Package } from "lucide-react";
-import { formatNumber, formatDate, formatCurrency } from "@/lib/formatters";
+import { ArrowLeft, TrendingUp, TrendingDown } from "lucide-react";
+import { formatNumber, formatDate } from "@/lib/formatters";
 import { useTranslation } from "@/lib/i18n";
 
 export interface MovementData {
@@ -51,7 +51,7 @@ export function StockHistoryView({ movements }: { movements: MovementData[] }) {
           <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
             <tr>
               <th className="px-6 py-4">{t("dateAndTime")}</th>
-              <th className="px-6 py-4">{t("itemNameSkuCol")}</th>
+              <th className="px-6 py-4">{t("itemNameCol")}</th>
               <th className="px-6 py-4">{t("movementTypeCol")}</th>
               <th className="px-6 py-4 text-center">{t("qtyDeltaCol")}</th>
               <th className="px-6 py-4 text-center">{t("stockProgressionCol")}</th>

@@ -1,13 +1,22 @@
 import { db } from "@/server/db";
 import { AuditLogsView, AuditLogItem } from "@/components/audit/AuditLogsView";
+import { Prisma } from "@prisma/client";
+import { getCurrentSession } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 
+type AuditLogWithUser = Prisma.AuditLogGetPayload<{
+  include: { user: { select: { name: true; email: true } } };
+}>;
+
 export default async function AuditLogsPage() {
-  let logs: any[] = [];
+  const session = await getCurrentSession();
+  if (!session) return null;
+  let logs: AuditLogWithUser[] = [];
 
   try {
     logs = await db.auditLog.findMany({
+      where: { shopId: session.shopId },
       include: {
         user: { select: { name: true, email: true } },
       },

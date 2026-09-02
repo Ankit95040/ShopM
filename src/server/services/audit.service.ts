@@ -3,6 +3,7 @@ import { AuditAction, Prisma } from "@prisma/client";
 
 export class AuditService {
   static async log({
+    shopId,
     userId,
     action,
     entityType,
@@ -13,6 +14,7 @@ export class AuditService {
     changeReason,
     ipAddress,
   }: {
+    shopId: string;
     userId: string;
     action: AuditAction;
     entityType: string;
@@ -26,6 +28,7 @@ export class AuditService {
     try {
       return await db.auditLog.create({
         data: {
+          shopId,
           userId,
           action,
           entityType,

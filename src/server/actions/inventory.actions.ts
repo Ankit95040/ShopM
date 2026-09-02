@@ -1,24 +1,28 @@
 "use server";
 
 import { db } from "@/server/db";
-import { StockMovementType, StockRemovalReason } from "@prisma/client";
+import { requireAuth } from "@/server/auth";
+import { StockMovementType, StockRemovalReason, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 export async function createCategoryAction(name: string, description?: string) {
   try {
+    const session = await requireAuth();
     if (!name.trim()) return { success: false, error: "Category name is required" };
 
     const category = await db.inventoryCategory.create({
       data: {
+        shopId: session.shopId,
         name: name.trim(),
         description: description?.trim() || null,
       },
     });
 
     revalidatePath("/inventory");
+    revalidatePath("/");
     return { success: true, category };
-  } catch (error: any) {
-    return { success: false, error: error.message || "Failed to create category" };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to create category" };
   }
 }
 
@@ -32,7 +36,6 @@ export async function createInventoryItemAction({
   purchasePrice,
   sellingPrice,
   initialStock = 0,
-  createdById,
 }: {
   categoryId: string;
   locationId?: string;
@@ -43,14 +46,29 @@ export async function createInventoryItemAction({
   purchasePrice?: number;
   sellingPrice?: number;
   initialStock?: number;
-  createdById: string;
 }) {
   try {
+    const session = await requireAuth();
     if (!name.trim()) return { success: false, error: "Item name is required" };
+
+    const category = await db.inventoryCategory.findFirst({
+      where: { id: categoryId, shopId: session.shopId },
+      select: { id: true },
+    });
+    if (!category) return { success: false, error: "Category not found" };
+
+    if (locationId) {
+      const location = await db.location.findFirst({
+        where: { id: locationId, shopId: session.shopId, isDeleted: false },
+        select: { id: true },
+      });
+      if (!location) return { success: false, error: "Location not found" };
+    }
 
     const item = await db.$transaction(async (prisma) => {
       const newItem = await prisma.inventoryItem.create({
         data: {
+          shopId: session.shopId,
           categoryId,
           locationId: locationId || null,
           name: name.trim(),
@@ -60,7 +78,7 @@ export async function createInventoryItemAction({
           minStockThreshold: minStockThreshold !== undefined ? minStockThreshold : 5,
           purchasePrice: purchasePrice || null,
           sellingPrice: sellingPrice || null,
-          createdById,
+          createdById: session.userId,
         },
       });
 
@@ -74,7 +92,8 @@ export async function createInventoryItemAction({
             newStock: initialStock,
             purchasePrice: purchasePrice || null,
             notes: "Initial Opening Stock",
-            createdById,
+            shopId: session.shopId,
+            createdById: session.userId,
           },
         });
       }
@@ -102,8 +121,8 @@ export async function createInventoryItemAction({
         createdAt: item.createdAt,
       },
     };
-  } catch (error: any) {
-    return { success: false, error: error.message || "Failed to create inventory item" };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to create inventory item" };
   }
 }
 
@@ -114,7 +133,6 @@ export async function addStockAction({
   purchasePrice,
   notes,
   movementDate,
-  createdById,
 }: {
   itemId: string;
   quantity: number;
@@ -122,16 +140,16 @@ export async function addStockAction({
   purchasePrice?: number;
   notes?: string;
   movementDate?: Date | string;
-  createdById: string;
 }) {
   try {
+    const session = await requireAuth();
     if (!quantity || quantity <= 0) {
       return { success: false, error: "Quantity must be positive" };
     }
 
     const result = await db.$transaction(async (prisma) => {
       const item = await prisma.inventoryItem.findUniqueOrThrow({
-        where: { id: itemId },
+        where: { id: itemId, shopId: session.shopId },
       });
 
       const prevStock = Number(item.currentStock);
@@ -142,12 +160,13 @@ export async function addStockAction({
         data: {
           currentStock: newStock,
           purchasePrice: purchasePrice !== undefined ? purchasePrice : item.purchasePrice,
-          updatedById: createdById,
+          updatedById: session.userId,
         },
       });
 
       const movement = await prisma.stockMovement.create({
         data: {
+          shopId: session.shopId,
           itemId,
           type: StockMovementType.ADD_STOCK,
           quantity,
@@ -157,7 +176,7 @@ export async function addStockAction({
           purchasePrice: purchasePrice || null,
           notes: notes?.trim() || null,
           movementDate: movementDate ? new Date(movementDate) : new Date(),
-          createdById,
+          createdById: session.userId,
         },
       });
 
@@ -182,8 +201,8 @@ export async function addStockAction({
     revalidatePath("/");
 
     return { success: true, result };
-  } catch (error: any) {
-    return { success: false, error: error.message || "Failed to add stock" };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to add stock" };
   }
 }
 
@@ -193,23 +212,22 @@ export async function removeStockAction({
   removalReason,
   notes,
   movementDate,
-  createdById,
 }: {
   itemId: string;
   quantity: number;
   removalReason: StockRemovalReason;
   notes?: string;
   movementDate?: Date | string;
-  createdById: string;
 }) {
   try {
+    const session = await requireAuth();
     if (!quantity || quantity <= 0) {
       return { success: false, error: "Quantity must be positive" };
     }
 
     const result = await db.$transaction(async (prisma) => {
       const item = await prisma.inventoryItem.findUniqueOrThrow({
-        where: { id: itemId },
+        where: { id: itemId, shopId: session.shopId },
       });
 
       const prevStock = Number(item.currentStock);
@@ -219,12 +237,13 @@ export async function removeStockAction({
         where: { id: itemId },
         data: {
           currentStock: newStock,
-          updatedById: createdById,
+          updatedById: session.userId,
         },
       });
 
       const movement = await prisma.stockMovement.create({
         data: {
+          shopId: session.shopId,
           itemId,
           type: StockMovementType.REMOVE_STOCK,
           removalReason,
@@ -233,7 +252,7 @@ export async function removeStockAction({
           newStock,
           notes: notes?.trim() || null,
           movementDate: movementDate ? new Date(movementDate) : new Date(),
-          createdById,
+          createdById: session.userId,
         },
       });
 
@@ -257,8 +276,8 @@ export async function removeStockAction({
     revalidatePath("/");
 
     return { success: true, result };
-  } catch (error: any) {
-    return { success: false, error: error.message || "Failed to remove stock" };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to remove stock" };
   }
 }
 
@@ -272,7 +291,9 @@ export async function getInventoryAction({
   lowStockOnly?: boolean;
 } = {}) {
   try {
-    const whereClause: any = {
+    const session = await requireAuth();
+    const whereClause: Prisma.InventoryItemWhereInput = {
+      shopId: session.shopId,
       isDeleted: false,
     };
 
@@ -297,6 +318,7 @@ export async function getInventoryAction({
     });
 
     const categories = await db.inventoryCategory.findMany({
+      where: { shopId: session.shopId },
       orderBy: { name: "asc" },
     });
 
@@ -328,15 +350,18 @@ export async function getInventoryAction({
       items: formatted,
       categories: categories.map((c) => ({ id: c.id, name: c.name })),
     };
-  } catch (error: any) {
-    return { success: false, error: error.message || "Failed to fetch inventory" };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch inventory" };
   }
 }
 
 export async function getStockMovementsAction(itemId?: string) {
   try {
+    const session = await requireAuth();
     const movements = await db.stockMovement.findMany({
-      where: itemId ? { itemId } : undefined,
+      where: itemId
+        ? { itemId, shopId: session.shopId }
+        : { shopId: session.shopId },
       include: {
         item: { select: { name: true, sku: true, unit: true } },
         createdBy: { select: { name: true } },
@@ -363,7 +388,7 @@ export async function getStockMovementsAction(itemId?: string) {
     }));
 
     return { success: true, movements: formatted };
-  } catch (error: any) {
-    return { success: false, error: error.message || "Failed to fetch stock movements" };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch stock movements" };
   }
 }

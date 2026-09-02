@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useState } from "react";
 import { translations, Language, TranslationKey } from "./translations";
 
 interface LanguageContextType {
@@ -14,21 +14,19 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 
 const STORAGE_KEY = "shopm_language";
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<Language>("en");
-  const [mounted, setMounted] = useState(false);
+type TranslationDict = Record<TranslationKey, string>;
 
-  useEffect(() => {
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const [language, setLanguageState] = useState<Language>(() => {
+    if (typeof window === "undefined") return "en";
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved === "en" || saved === "hi") {
-        setLanguageState(saved);
-      }
+      if (saved === "en" || saved === "hi") return saved;
     } catch {
-      // Ignore localStorage errors in restricted environments
+      // Ignore localStorage errors
     }
-    setMounted(true);
-  }, []);
+    return "en";
+  });
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
@@ -45,8 +43,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   };
 
   const t = (key: TranslationKey, params?: Record<string, string | number>): string => {
-    const langDict = translations[language] || translations.en;
-    let template = (langDict as any)[key] || (translations.en as any)[key] || key;
+    const langDict = (translations[language] || translations.en) as TranslationDict;
+    let template = langDict[key] || (translations.en as TranslationDict)[key] || key;
 
     if (params) {
       for (const [paramKey, val] of Object.entries(params)) {

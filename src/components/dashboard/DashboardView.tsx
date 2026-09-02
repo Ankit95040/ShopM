@@ -1,27 +1,22 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Receipt,
   Boxes,
-  Users,
-  CreditCard,
-  TrendingUp,
-  AlertTriangle,
   ArrowRight,
-  Clock,
-  Building2,
+  X,
+  FileText,
 } from "lucide-react";
-import { formatCurrency, formatDate, formatNumber } from "@/lib/formatters";
+import { formatCurrency, formatDate } from "@/lib/formatters";
 import { useTranslation } from "@/lib/i18n";
+import { getBillImageSignedUrl } from "@/server/actions/upload.actions";
+import { ImageViewer } from "@/components/shared/ImageViewer";
+import { useToast } from "@/components/shared/ToastContext";
 
 export interface DashboardMetrics {
   userGreetingName?: string;
-  totalCustomers: number;
-  totalDebt: number;
-  totalReceived: number;
-  outstandingBalance: number;
-  totalLocations: number;
   totalItems: number;
   lowStockCount: number;
   outOfStockCount: number;
@@ -33,9 +28,32 @@ export interface DashboardMetrics {
     paymentMethod?: string | null;
     transactionDate: string | Date;
     customerName: string;
+    customerId: string;
     createdByName: string;
+    billImageKey?: string | null;
+  }>;
+  allTransactions: Array<{
+    id: string;
+    type: string;
+    amount: number;
+    paymentMethod?: string | null;
+    transactionDate: string | Date;
+    customerName: string;
+    customerId: string;
+    createdByName: string;
+    billImageKey?: string | null;
   }>;
   recentMovements: Array<{
+    id: string;
+    type: string;
+    quantity: number;
+    removalReason?: string | null;
+    movementDate: string | Date;
+    itemName: string;
+    itemUnit: string;
+    createdByName: string;
+  }>;
+  allMovements: Array<{
     id: string;
     type: string;
     quantity: number;
@@ -49,26 +67,65 @@ export interface DashboardMetrics {
 
 export function DashboardView({ data }: { data: DashboardMetrics }) {
   const { t } = useTranslation();
+  const toast = useToast();
+  const [selectedImageView, setSelectedImageView] = useState<string | null>(null);
+
+  // View All modals
+  const [showTransactionsModal, setShowTransactionsModal] = useState(false);
+  const [showMovementsModal, setShowMovementsModal] = useState(false);
 
   const {
     userGreetingName,
-    totalCustomers,
-    totalDebt,
-    totalReceived,
-    outstandingBalance,
-    totalLocations,
-    totalItems,
-    lowStockCount,
-    outOfStockCount,
     isDbConnected,
     recentTransactions,
+    allTransactions,
     recentMovements,
+    allMovements,
   } = data;
 
-  // Dynamic greeting: "Namaste [Name] Ji 🙏" or fallback "Namaste Ji 🙏"
   const greetingText = userGreetingName
     ? t("greetingNamed", { name: userGreetingName })
     : t("greetingFallback");
+
+  const handleViewBillImage = async (tx: { id: string; customerId: string }) => {
+    const res = await getBillImageSignedUrl({
+      transactionId: tx.id,
+      customerId: tx.customerId,
+    });
+    if (res.success && res.url) {
+      setSelectedImageView(res.url);
+    } else {
+      toast.error(res.error || "Failed to load bill image");
+    }
+  };
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (showTransactionsModal || showMovementsModal) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [showTransactionsModal, showMovementsModal]);
+
+  // Close modal on Escape
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setShowTransactionsModal(false);
+      setShowMovementsModal(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showTransactionsModal || showMovementsModal) {
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [showTransactionsModal, showMovementsModal, handleKeyDown]);
+
+  const hasMoreTransactions = allTransactions.length > recentTransactions.length;
+  const hasMoreMovements = allMovements.length > recentMovements.length;
 
   return (
     <div className="p-4 sm:p-8 space-y-8 max-w-7xl mx-auto">
@@ -106,7 +163,7 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
         </div>
       </div>
 
-      {/* TWO PRIMARY MODULE CARDS (LARGE TOUCH-FRIENDLY) */}
+      {/* TWO PRIMARY MODULE CARDS */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* 1. BILLING CARD */}
         <Link
@@ -130,22 +187,7 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
           </div>
 
           <div className="mt-8 border-t border-slate-700/60 pt-6">
-            <div className="grid grid-cols-2 gap-4 text-left">
-              <div>
-                <span className="text-[11px] font-bold text-slate-400">{t("totalOutstanding")}</span>
-                <div className="text-xl font-black text-red-400">
-                  {formatCurrency(outstandingBalance)}
-                </div>
-              </div>
-              <div>
-                <span className="text-[11px] font-bold text-slate-400">{t("totalCustomers")}</span>
-                <div className="text-xl font-black text-white">
-                  {t("registeredCustomers", { count: totalCustomers })}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 flex items-center justify-between text-xs font-bold text-sky-400">
+            <div className="flex items-center justify-between text-xs font-bold text-sky-400">
               <span>{t("openBillingLocations")}</span>
               <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition" />
             </div>
@@ -174,18 +216,7 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
           </div>
 
           <div className="mt-8 border-t border-slate-700/60 pt-6">
-            <div className="grid grid-cols-2 gap-4 text-left">
-              <div>
-                <span className="text-[11px] font-bold text-slate-400">{t("totalCatalogItems")}</span>
-                <div className="text-xl font-black text-white">{totalItems} SKUs</div>
-              </div>
-              <div>
-                <span className="text-[11px] font-bold text-slate-400">{t("lowStockAlert")}</span>
-                <div className="text-xl font-black text-amber-400">{lowStockCount} Items</div>
-              </div>
-            </div>
-
-            <div className="mt-6 flex items-center justify-between text-xs font-bold text-emerald-400">
+            <div className="flex items-center justify-between text-xs font-bold text-emerald-400">
               <span>{t("manageShopStock")}</span>
               <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition" />
             </div>
@@ -193,70 +224,67 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
         </Link>
       </div>
 
-      {/* DASHBOARD METRIC GRIDS */}
+      {/* DASHBOARD CONTENT: Recent Transactions + Inventory Summary */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Billing Overview Section */}
+        {/* Recent Transactions Section */}
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-sky-600" />
-              <h3 className="text-base font-black text-slate-900">{t("billingKhataSummary")}</h3>
+              <h3 className="text-base font-black text-slate-900">{t("recentTransactions")}</h3>
             </div>
-            <Link href="/billing" className="text-xs font-bold text-sky-600 hover:underline">
-              {t("viewLocationsArrow")}
+            <Link href="/reports" className="text-xs font-bold text-sky-600 hover:underline">
+              {t("viewReports")}
             </Link>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-2xl bg-slate-50 p-3 border border-slate-100">
-              <span className="text-[11px] font-bold text-slate-500">{t("totalDebtBills")}</span>
-              <div className="text-sm font-black text-slate-900 mt-0.5">
-                {formatCurrency(totalDebt)}
-              </div>
-            </div>
-            <div className="rounded-2xl bg-emerald-50/60 p-3 border border-emerald-100">
-              <span className="text-[11px] font-bold text-emerald-800">{t("paymentsReceived")}</span>
-              <div className="text-sm font-black text-emerald-700 mt-0.5">
-                {formatCurrency(totalReceived)}
-              </div>
-            </div>
-            <div className="rounded-2xl bg-red-50/70 p-3 border border-red-100">
-              <span className="text-[11px] font-bold text-red-800">{t("outstandingBalanceDue")}</span>
-              <div className="text-sm font-black text-red-600 mt-0.5">
-                {formatCurrency(outstandingBalance)}
-              </div>
-            </div>
+          <div className="divide-y divide-slate-100 text-xs">
+            {recentTransactions.length > 0 ? (
+              recentTransactions.map((tx) => (
+                <div key={tx.id} className="py-2.5 flex items-center justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-slate-900 truncate">
+                      {tx.customerName} ({tx.type === "DEBT" ? t("billLabel") : tx.paymentMethod || t("paymentLabel")})
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] text-slate-400">
+                        {formatDate(tx.transactionDate, "dd MMM, hh:mm a")} \u{2022} {t("addedBy")}: {tx.createdByName}
+                      </span>
+                      {tx.billImageKey && (
+                        <button
+                          onClick={() => handleViewBillImage(tx)}
+                          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-sky-50 text-sky-600 hover:bg-sky-100 transition"
+                          title={t("viewBillImage")}
+                        >
+                          <FileText className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <span
+                    className={`font-black shrink-0 ml-2 ${
+                      tx.type === "DEBT" ? "text-red-600" : "text-emerald-600"
+                    }`}
+                  >
+                    {tx.type === "DEBT" ? "+" : "-"}{formatCurrency(tx.amount)}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="text-slate-400 py-4 text-center">{t("noRecentTransactions")}</p>
+            )}
           </div>
 
-          {/* Recent Transactions List */}
-          <div className="pt-2">
-            <h4 className="text-xs font-bold text-slate-700 mb-2">{t("recentTransactions")}</h4>
-            <div className="divide-y divide-slate-100 text-xs">
-              {recentTransactions.length > 0 ? (
-                recentTransactions.map((tItem) => (
-                  <div key={tItem.id} className="py-2.5 flex items-center justify-between">
-                    <div>
-                      <div className="font-bold text-slate-900">
-                        {tItem.customerName} ({tItem.type === "DEBT" ? "Debt" : tItem.paymentMethod || "Payment"})
-                      </div>
-                      <span className="text-[10px] text-slate-400">
-                        {formatDate(tItem.transactionDate, "dd MMM, hh:mm a")} • {t("addedBy")}: {tItem.createdByName}
-                      </span>
-                    </div>
-                    <span
-                      className={`font-black ${
-                        tItem.type === "DEBT" ? "text-red-600" : "text-emerald-600"
-                      }`}
-                    >
-                      {tItem.type === "DEBT" ? "+" : "-"}{formatCurrency(tItem.amount)}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-slate-400 py-4 text-center">{t("noRecentTransactions")}</p>
-              )}
-            </div>
-          </div>
+          {/* View All Button */}
+          {hasMoreTransactions && (
+            <button
+              onClick={() => setShowTransactionsModal(true)}
+              className="flex items-center justify-center gap-1.5 w-full pt-2 text-xs font-bold text-sky-600 hover:text-sky-700 transition min-h-[44px]"
+            >
+              <span>{t("viewAll")}</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Inventory Overview Section */}
@@ -271,52 +299,173 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
             </Link>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-2xl bg-slate-50 p-3 border border-slate-100">
-              <span className="text-[11px] font-bold text-slate-500">{t("totalCatalogItems")}</span>
-              <div className="text-sm font-black text-slate-900 mt-0.5">{totalItems} SKUs</div>
-            </div>
-            <div className="rounded-2xl bg-amber-50/70 p-3 border border-amber-100">
-              <span className="text-[11px] font-bold text-amber-800">{t("lowStockAlert")}</span>
-              <div className="text-sm font-black text-amber-900 mt-0.5">{lowStockCount} Items</div>
-            </div>
-            <div className="rounded-2xl bg-red-50/70 p-3 border border-red-100">
-              <span className="text-[11px] font-bold text-red-800">{t("outOfStock")}</span>
-              <div className="text-sm font-black text-red-900 mt-0.5">{outOfStockCount} Items</div>
-            </div>
-          </div>
-
-          {/* Recent Stock Movements List */}
-          <div className="pt-2">
-            <h4 className="text-xs font-bold text-slate-700 mb-2">{t("recentStockMovements")}</h4>
-            <div className="divide-y divide-slate-100 text-xs">
-              {recentMovements.length > 0 ? (
-                recentMovements.map((m) => (
-                  <div key={m.id} className="py-2.5 flex items-center justify-between">
-                    <div>
-                      <div className="font-bold text-slate-900">
-                        {m.itemName} ({m.type === "ADD_STOCK" ? t("stockInflow") : `${t("stockOutflow")}: ${m.removalReason || "Sold"}`})
-                      </div>
-                      <span className="text-[10px] text-slate-400">
-                        {formatDate(m.movementDate, "dd MMM, hh:mm a")} • {t("addedBy")}: {m.createdByName}
-                      </span>
+          <div className="divide-y divide-slate-100 text-xs">
+            {recentMovements.length > 0 ? (
+              recentMovements.map((m) => (
+                <div key={m.id} className="py-2.5 flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-slate-900">
+                      {m.itemName} ({m.type === "ADD_STOCK" ? t("stockInflow") : t("stockOutflow")})
                     </div>
-                    <span
-                      className={`font-black ${
-                        m.type === "ADD_STOCK" ? "text-emerald-600" : "text-red-600"
-                      }`}
-                    >
-                      {m.type === "ADD_STOCK" ? "+" : "-"}{m.quantity} {m.itemUnit}
+                    <span className="text-[10px] text-slate-400">
+                      {formatDate(m.movementDate, "dd MMM, hh:mm a")} \u{2022} {t("addedBy")}: {m.createdByName}
                     </span>
                   </div>
-                ))
-              ) : (
-                <p className="text-slate-400 py-4 text-center">{t("noRecentMovements")}</p>
-              )}
+                  <span
+                    className={`font-black shrink-0 ml-2 ${
+                      m.type === "ADD_STOCK" ? "text-emerald-600" : "text-red-600"
+                    }`}
+                  >
+                    {m.type === "ADD_STOCK" ? "+" : "-"}{m.quantity} {m.itemUnit}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="text-slate-400 py-4 text-center">{t("noRecentMovements")}</p>
+            )}
+          </div>
+
+          {/* View All Button */}
+          {hasMoreMovements && (
+            <button
+              onClick={() => setShowMovementsModal(true)}
+              className="flex items-center justify-center gap-1.5 w-full pt-2 text-xs font-bold text-emerald-600 hover:text-emerald-700 transition min-h-[44px]"
+            >
+              <span>{t("viewAll")}</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* TRANSACTIONS VIEW ALL MODAL */}
+      {showTransactionsModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs">
+          <div className="w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[80vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="text-sm font-black text-slate-900">{t("recentTransactions")}</h3>
+                <p className="text-[11px] text-slate-400">{allTransactions.length} {t("viewAllShowing")}</p>
+              </div>
+              <button
+                onClick={() => setShowTransactionsModal(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto px-5 py-3 divide-y divide-slate-100 text-xs overscroll-contain">
+              {allTransactions.map((tx) => (
+                <div key={tx.id} className="py-3 flex items-center justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-slate-900 truncate">
+                      {tx.customerName} ({tx.type === "DEBT" ? t("billLabel") : tx.paymentMethod || t("paymentLabel")})
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] text-slate-400">
+                        {formatDate(tx.transactionDate, "dd MMM, hh:mm a")} \u{2022} {t("addedBy")}: {tx.createdByName}
+                      </span>
+                      {tx.billImageKey && (
+                        <button
+                          onClick={() => handleViewBillImage(tx)}
+                          className="inline-flex items-center justify-center h-7 w-7 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition"
+                          title={t("viewBillImage")}
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <span
+                    className={`font-black shrink-0 ml-2 ${
+                      tx.type === "DEBT" ? "text-red-600" : "text-emerald-600"
+                    }`}
+                  >
+                    {tx.type === "DEBT" ? "+" : "-"}{formatCurrency(tx.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3 border-t border-slate-100 shrink-0">
+              <button
+                onClick={() => setShowTransactionsModal(false)}
+                className="w-full rounded-xl bg-slate-900 py-3 text-sm font-black text-white hover:bg-slate-800 transition min-h-[44px]"
+              >
+                {t("close")}
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* MOVEMENTS VIEW ALL MODAL */}
+      {showMovementsModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs">
+          <div className="w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[80vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="text-sm font-black text-slate-900">{t("inventoryStockSummary")}</h3>
+                <p className="text-[11px] text-slate-400">{allMovements.length} {t("viewAllShowing")}</p>
+              </div>
+              <button
+                onClick={() => setShowMovementsModal(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto px-5 py-3 divide-y divide-slate-100 text-xs overscroll-contain">
+              {allMovements.map((m) => (
+                <div key={m.id} className="py-3 flex items-center justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-slate-900 truncate">
+                      {m.itemName} ({m.type === "ADD_STOCK" ? t("stockInflow") : t("stockOutflow")})
+                    </div>
+                    <span className="text-[10px] text-slate-400">
+                      {formatDate(m.movementDate, "dd MMM, hh:mm a")} \u{2022} {t("addedBy")}: {m.createdByName}
+                    </span>
+                  </div>
+                  <span
+                    className={`font-black shrink-0 ml-2 ${
+                      m.type === "ADD_STOCK" ? "text-emerald-600" : "text-red-600"
+                    }`}
+                  >
+                    {m.type === "ADD_STOCK" ? "+" : "-"}{m.quantity} {m.itemUnit}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3 border-t border-slate-100 shrink-0">
+              <button
+                onClick={() => setShowMovementsModal(false)}
+                className="w-full rounded-xl bg-slate-900 py-3 text-sm font-black text-white hover:bg-slate-800 transition min-h-[44px]"
+              >
+                {t("close")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bill Image Viewer */}
+      <ImageViewer
+        src={selectedImageView || ""}
+        alt="Bill Image"
+        isOpen={!!selectedImageView}
+        onClose={() => setSelectedImageView(null)}
+      />
     </div>
   );
 }

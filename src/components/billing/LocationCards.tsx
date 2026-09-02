@@ -3,19 +3,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  MapPin,
   Plus,
   Search,
   Users,
   ArrowRight,
-  TrendingUp,
-  CreditCard,
   Building2,
   Trash2,
+  MapPin,
 } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/formatters";
-import { createLocationAction, softDeleteLocationAction } from "@/server/actions/location.actions";
+import { formatCurrency } from "@/lib/formatters";
+import { createLocationAction, softDeleteLocationAction, restoreLocationAction } from "@/server/actions/location.actions";
 import { useTranslation } from "@/lib/i18n";
+import { ConfirmModal } from "@/components/shared/ConfirmModal";
+import { useToast } from "@/components/shared/ToastContext";
+import type { ShopBillingSummary } from "@/server/actions/billing.actions";
 
 export interface LocationData {
   id: string;
@@ -31,38 +32,38 @@ export interface LocationData {
 
 export function LocationCards({
   initialLocations,
-  userId,
+  shopBillingSummary,
 }: {
   initialLocations: LocationData[];
-  userId: string;
+  shopBillingSummary: ShopBillingSummary;
 }) {
   const { t } = useTranslation();
+  const toast = useToast();
   const [locations, setLocations] = useState(initialLocations);
   const [search, setSearch] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const [deleteTarget, setDeleteTarget] = useState<LocationData | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const filtered = locations.filter((loc) =>
     loc.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalAllDebt = locations.reduce((a, b) => a + b.totalDebt, 0);
-  const totalAllReceived = locations.reduce((a, b) => a + b.totalReceived, 0);
-  const totalAllBalance = totalAllDebt - totalAllReceived;
+  const { outstandingBalance: totalAllBalance, totalReceived: totalAllReceived, totalCustomerCount } =
+    shopBillingSummary;
 
   const handleCreateLocation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
-    setErrorMsg(null);
     setIsSubmitting(true);
     const res = await createLocationAction({
       name,
       description,
-      createdById: userId,
     });
     setIsSubmitting(false);
 
@@ -82,152 +83,223 @@ export function LocationCards({
       setIsAddModalOpen(false);
       setName("");
       setDescription("");
+      toast.success("Location added successfully");
     } else {
-      setErrorMsg(res.error || "Failed to create location");
+      toast.error(res.error || "Failed to create location");
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
+  const handleDeleteClick = (e: React.MouseEvent, loc: LocationData) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!confirm("Are you sure you want to delete this location?")) return;
-
-    const res = await softDeleteLocationAction(id);
-    if (res.success) {
-      setLocations(locations.filter((l) => l.id !== id));
-    }
+    setDeleteTarget(loc);
   };
 
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    const res = await softDeleteLocationAction(deleteTarget.id);
+    setIsDeleting(false);
+
+    if (res.success && "archivedCustomerIds" in res) {
+      const deletedId = deleteTarget.id;
+      setLocations(locations.filter((l) => l.id !== deletedId));
+      toast.undo("Location deleted successfully", async () => {
+        const restoreRes = await restoreLocationAction(deletedId);
+        if (restoreRes.success) {
+          window.location.reload();
+        }
+      });
+    } else {
+      toast.error("Failed to delete location");
+    }
+    setDeleteTarget(null);
+  };
+
+  const isEmpty = locations.length === 0;
+  const noResults = !isEmpty && filtered.length === 0;
+
   return (
-    <div className="space-y-6">
-      {/* Header with Title & Action */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
             {t("billingLocationsTitle")}
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="mt-0.5 text-xs text-slate-500">
             {t("billingLocationsSubtitle")}
           </p>
         </div>
 
         <button
           onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-slate-800 transition active:scale-98"
+          className="inline-flex items-center gap-2 self-start rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-slate-800 active:scale-[0.98]"
         >
           <Plus className="h-4 w-4 text-sky-400" />
           <span>{t("addLocationBtn")}</span>
         </button>
       </div>
 
-      {/* Aggregate Balance Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-          <span className="text-xs font-semibold text-slate-500">{t("totalOutstanding")}</span>
-          <div className="mt-1 text-2xl font-black text-red-600">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{t("totalOutstanding")}</span>
+          <div className="mt-1 text-xl font-black text-red-600 sm:text-2xl">
             {formatCurrency(totalAllBalance)}
           </div>
-          <p className="text-[11px] text-slate-400 mt-0.5">Across all shop locations</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">Across all locations</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-          <span className="text-xs font-semibold text-slate-500">{t("paymentsReceived")}</span>
-          <div className="mt-1 text-2xl font-black text-emerald-600">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{t("paymentsReceived")}</span>
+          <div className="mt-1 text-xl font-black text-emerald-600 sm:text-2xl">
             {formatCurrency(totalAllReceived)}
           </div>
-          <p className="text-[11px] text-slate-400 mt-0.5">Collected from customers</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">Collected from customers</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-          <span className="text-xs font-semibold text-slate-500">{t("totalCustomers")}</span>
-          <div className="mt-1 text-2xl font-black text-slate-900">
-            {t("registeredCustomers", { count: locations.reduce((a, b) => a + b.customerCount, 0) })}
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{t("totalCustomers")}</span>
+          <div className="mt-1 text-xl font-black text-slate-900 sm:text-2xl">
+            {t("registeredCustomers", { count: totalCustomerCount })}
           </div>
-          <p className="text-[11px] text-slate-400 mt-0.5">
-            {locations.length} Locations / Outlets
+          <p className="mt-0.5 text-[11px] text-slate-400">
+            {locations.length} Location{locations.length !== 1 ? "s" : ""}
           </p>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative">
-        <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
-        <input
-          type="text"
-          placeholder={t("searchLocationsPlaceholder")}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-2xl border border-slate-300 bg-white py-3 pl-10 pr-4 text-sm text-slate-900 placeholder-slate-400 shadow-xs focus:border-slate-900 focus:outline-none"
-        />
-      </div>
+      {/* Locations Section */}
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-sm font-bold text-slate-900">
+            Your Locations
+          </h2>
 
-      {/* Locations Grid */}
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((loc) => (
-          <Link
-            key={loc.id}
-            href={`/billing/${loc.id}`}
-            className="group relative flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-xs transition hover:border-slate-900 hover:shadow-md active:scale-99"
-          >
-            <div>
-              <div className="flex items-start justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-50 text-sky-600 group-hover:bg-slate-900 group-hover:text-white transition">
-                  <Building2 className="h-6 w-6" />
+          {!isEmpty && (
+            <div className="relative w-full sm:max-w-xs">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder={t("searchLocationsPlaceholder")}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder-slate-400 shadow-xs transition focus:border-slate-900 focus:outline-none"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Empty State */}
+        {isEmpty && (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
+              <MapPin className="h-7 w-7 text-slate-400" />
+            </div>
+            <h3 className="mt-4 text-sm font-bold text-slate-900">No locations yet</h3>
+            <p className="mt-1 text-xs text-slate-500 max-w-xs mx-auto">
+              Add your first shop location or branch to start managing customers and billing.
+            </p>
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-slate-800 active:scale-[0.98]"
+            >
+              <Plus className="h-4 w-4 text-sky-400" />
+              {t("addLocationBtn")}
+            </button>
+          </div>
+        )}
+
+        {/* No Search Results */}
+        {noResults && (
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
+            <Search className="mx-auto h-8 w-8 text-slate-300" />
+            <p className="mt-3 text-sm font-semibold text-slate-600">No locations match &ldquo;{search}&rdquo;</p>
+            <p className="mt-1 text-xs text-slate-400">Try a different search term.</p>
+          </div>
+        )}
+
+        {/* Location Cards */}
+        {!isEmpty && filtered.length > 0 && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((loc) => (
+              <Link
+                key={loc.id}
+                href={`/billing/${loc.id}`}
+                className="group relative flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition hover:border-slate-900 hover:shadow-md active:scale-[0.99]"
+              >
+                <div>
+                  <div className="flex items-start justify-between">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600 transition group-hover:bg-slate-900 group-hover:text-white">
+                      <Building2 className="h-5 w-5" />
+                    </div>
+
+                    <button
+                      onClick={(e) => handleDeleteClick(e, loc)}
+                      title="Delete Location"
+                      className="rounded-lg p-1.5 text-slate-300 transition hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <h3 className="mt-3 text-base font-black text-slate-900 transition group-hover:text-sky-600">
+                    {loc.name}
+                  </h3>
+                  {loc.description && (
+                    <p className="mt-1 line-clamp-2 text-xs text-slate-500">{loc.description}</p>
+                  )}
+
+                  <div className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700">
+                    <Users className="h-3.5 w-3.5 text-slate-400" />
+                    <span>{t("registeredCustomers", { count: loc.customerCount })}</span>
+                  </div>
                 </div>
 
-                <button
-                  onClick={(e) => handleDelete(e, loc.id)}
-                  title="Delete Location"
-                  className="rounded-lg p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-600 transition"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-
-              <h3 className="mt-4 text-lg font-black text-slate-900 group-hover:text-sky-600 transition">
-                {loc.name}
-              </h3>
-              {loc.description && (
-                <p className="mt-1 line-clamp-2 text-xs text-slate-500">{loc.description}</p>
-              )}
-
-              <div className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                <Users className="h-4 w-4 text-slate-400" />
-                <span>{t("registeredCustomers", { count: loc.customerCount })}</span>
-              </div>
-            </div>
-
-            {/* Financial summary on card */}
-            <div className="mt-5 border-t border-slate-100 pt-4">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500">{t("balanceDue")}:</span>
-                <span className="text-base font-black text-red-600">
-                  {formatCurrency(loc.outstandingBalance)}
-                </span>
-              </div>
-              <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
-                <span>{t("addedBy")}: {loc.createdByName}</span>
-                <span className="flex items-center gap-1 font-bold text-sky-600 group-hover:translate-x-0.5 transition">
-                  {t("openCustomers")} <ArrowRight className="h-3 w-3" />
-                </span>
-              </div>
-            </div>
-          </Link>
-        ))}
+                <div className="mt-4 border-t border-slate-100 pt-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">{t("balanceDue")}:</span>
+                    <span className="text-base font-black text-red-600">
+                      {formatCurrency(loc.outstandingBalance)}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
+                    <span>{t("addedBy")}: {loc.createdByName}</span>
+                    <span className="flex items-center gap-1 font-bold text-sky-600 transition group-hover:translate-x-0.5">
+                      {t("openCustomers")} <ArrowRight className="h-3 w-3" />
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* DELETE LOCATION CONFIRM MODAL */}
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        title="Delete Location?"
+        description={
+          deleteTarget
+            ? `Are you sure you want to delete "${deleteTarget.name}"? Customers and financial history will be preserved and hidden from active views. You can restore from the Recycle Bin within 30 days.`
+            : ""
+        }
+        confirmLabel="Delete Location"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+        isLoading={isDeleting}
+      />
 
       {/* ADD LOCATION MODAL */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
             <h3 className="text-lg font-bold text-slate-900">{t("createLocationTitle")}</h3>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="mt-0.5 text-xs text-slate-500">
               {t("createLocationSubtitle")}
             </p>
-
-            {errorMsg && (
-              <div className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">{errorMsg}</div>
-            )}
 
             <form onSubmit={handleCreateLocation} className="mt-4 space-y-4">
               <div>

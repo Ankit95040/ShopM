@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/server/db";
+import { requireAuth } from "@/server/auth";
 import { TransactionType, PaymentMethod, AuditAction } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
@@ -12,7 +13,6 @@ export async function addDebtAction({
   billImageUrl,
   billImagePublicId,
   transactionDate,
-  createdById,
 }: {
   customerId: string;
   amount: number;
@@ -21,15 +21,22 @@ export async function addDebtAction({
   billImageUrl?: string;
   billImagePublicId?: string;
   transactionDate?: Date | string;
-  createdById: string;
 }) {
   try {
+    const session = await requireAuth();
     if (!amount || amount <= 0) {
       return { success: false, error: "Amount must be greater than zero" };
     }
 
+    const customer = await db.customer.findFirst({
+      where: { id: customerId, shopId: session.shopId, isDeleted: false },
+      select: { id: true, locationId: true },
+    });
+    if (!customer) return { success: false, error: "Customer not found" };
+
     const tx = await db.transaction.create({
       data: {
+        shopId: session.shopId,
         customerId,
         type: TransactionType.DEBT,
         amount,
@@ -38,21 +45,16 @@ export async function addDebtAction({
         billImageUrl: billImageUrl || null,
         billImagePublicId: billImagePublicId || null,
         transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
-        createdById,
+        createdById: session.userId,
       },
     });
 
-    const cust = await db.customer.findUnique({
-      where: { id: customerId },
-      select: { locationId: true },
-    });
-
-    if (cust) {
-      revalidatePath(`/billing/${cust.locationId}/customers/${customerId}`);
-      revalidatePath(`/billing/${cust.locationId}`);
-    }
+    revalidatePath(`/billing/${customer.locationId}/customers/${customerId}`);
+    revalidatePath(`/billing/${customer.locationId}`);
     revalidatePath("/billing");
     revalidatePath("/");
+    revalidatePath("/reports");
+    revalidatePath("/audit-logs");
 
     // Return plain serialized object without Decimal
     return {
@@ -67,13 +69,14 @@ export async function addDebtAction({
         description: tx.description,
         billImageUrl: tx.billImageUrl,
         billImagePublicId: tx.billImagePublicId,
+        billImageKey: tx.billImageKey,
         transactionDate: tx.transactionDate,
         createdAt: tx.createdAt,
         updatedAt: tx.updatedAt,
       },
     };
-  } catch (error: any) {
-    return { success: false, error: error.message || "Failed to add debt transaction" };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to add debt transaction" };
   }
 }
 
@@ -83,43 +86,44 @@ export async function addPaymentAction({
   paymentMethod,
   description,
   transactionDate,
-  createdById,
 }: {
   customerId: string;
   amount: number;
   paymentMethod: PaymentMethod;
   description?: string;
   transactionDate?: Date | string;
-  createdById: string;
 }) {
   try {
+    const session = await requireAuth();
     if (!amount || amount <= 0) {
       return { success: false, error: "Amount must be greater than zero" };
     }
 
+    const customer = await db.customer.findFirst({
+      where: { id: customerId, shopId: session.shopId, isDeleted: false },
+      select: { id: true, locationId: true },
+    });
+    if (!customer) return { success: false, error: "Customer not found" };
+
     const tx = await db.transaction.create({
       data: {
+        shopId: session.shopId,
         customerId,
         type: TransactionType.PAYMENT_RECEIVED,
         amount,
         paymentMethod,
         description: description?.trim() || null,
         transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
-        createdById,
+        createdById: session.userId,
       },
     });
 
-    const cust = await db.customer.findUnique({
-      where: { id: customerId },
-      select: { locationId: true },
-    });
-
-    if (cust) {
-      revalidatePath(`/billing/${cust.locationId}/customers/${customerId}`);
-      revalidatePath(`/billing/${cust.locationId}`);
-    }
+    revalidatePath(`/billing/${customer.locationId}/customers/${customerId}`);
+    revalidatePath(`/billing/${customer.locationId}`);
     revalidatePath("/billing");
     revalidatePath("/");
+    revalidatePath("/reports");
+    revalidatePath("/audit-logs");
 
     // Return plain serialized object without Decimal
     return {
@@ -139,8 +143,8 @@ export async function addPaymentAction({
         updatedAt: tx.updatedAt,
       },
     };
-  } catch (error: any) {
-    return { success: false, error: error.message || "Failed to add payment transaction" };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to add payment transaction" };
   }
 }
 
@@ -151,8 +155,8 @@ export async function editTransactionAction({
   paymentMethod,
   description,
   billImageUrl,
+  billImageKey,
   changeReason,
-  updatedById,
 }: {
   transactionId: string;
   amount: number;
@@ -160,16 +164,17 @@ export async function editTransactionAction({
   paymentMethod?: PaymentMethod;
   description?: string;
   billImageUrl?: string;
+  billImageKey?: string | null;
   changeReason: string;
-  updatedById: string;
 }) {
   try {
+    const session = await requireAuth();
     if (!changeReason?.trim()) {
       return { success: false, error: "Change reason is mandatory for financial audits" };
     }
 
-    const oldTx = await db.transaction.findUniqueOrThrow({
-      where: { id: transactionId },
+    const oldTx = await db.transaction.findFirstOrThrow({
+      where: { id: transactionId, shopId: session.shopId, isDeleted: false },
     });
 
     const updatedTx = await db.$transaction(async (prisma) => {
@@ -181,14 +186,16 @@ export async function editTransactionAction({
           paymentMethod: paymentMethod || null,
           description: description?.trim() || null,
           billImageUrl: billImageUrl !== undefined ? billImageUrl : oldTx.billImageUrl,
-          updatedById,
+          billImageKey: billImageKey !== undefined ? billImageKey : oldTx.billImageKey,
+          updatedById: session.userId,
         },
       });
 
       // Write immutable audit log
       await prisma.auditLog.create({
         data: {
-          userId: updatedById,
+          shopId: session.shopId,
+          userId: session.userId,
           action: AuditAction.UPDATE,
           entityType: "TRANSACTION",
           entityId: transactionId,
@@ -220,7 +227,12 @@ export async function editTransactionAction({
 
     if (cust) {
       revalidatePath(`/billing/${cust.locationId}/customers/${oldTx.customerId}`);
+      revalidatePath(`/billing/${cust.locationId}`);
     }
+    revalidatePath("/billing");
+    revalidatePath("/");
+    revalidatePath("/reports");
+    revalidatePath("/audit-logs");
 
     return {
       success: true,
@@ -233,28 +245,28 @@ export async function editTransactionAction({
         paymentMethod: updatedTx.paymentMethod,
         description: updatedTx.description,
         billImageUrl: updatedTx.billImageUrl,
+        billImageKey: updatedTx.billImageKey,
         transactionDate: updatedTx.transactionDate,
         createdAt: updatedTx.createdAt,
         updatedAt: updatedTx.updatedAt,
       },
     };
-  } catch (error: any) {
-    return { success: false, error: error.message || "Failed to edit transaction" };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to edit transaction" };
   }
 }
 
 export async function softDeleteTransactionAction({
   transactionId,
   reason,
-  deletedById,
 }: {
   transactionId: string;
   reason: string;
-  deletedById: string;
 }) {
   try {
-    const oldTx = await db.transaction.findUniqueOrThrow({
-      where: { id: transactionId },
+    const session = await requireAuth();
+    const oldTx = await db.transaction.findFirstOrThrow({
+      where: { id: transactionId, shopId: session.shopId, isDeleted: false },
     });
 
     await db.$transaction(async (prisma) => {
@@ -263,13 +275,14 @@ export async function softDeleteTransactionAction({
         data: {
           isDeleted: true,
           deletedAt: new Date(),
-          deletedById,
+          deletedById: session.userId,
         },
       });
 
       await prisma.auditLog.create({
         data: {
-          userId: deletedById,
+          shopId: session.shopId,
+          userId: session.userId,
           action: AuditAction.DELETE,
           entityType: "TRANSACTION",
           entityId: transactionId,
@@ -293,9 +306,68 @@ export async function softDeleteTransactionAction({
       revalidatePath(`/billing/${cust.locationId}/customers/${oldTx.customerId}`);
       revalidatePath(`/billing/${cust.locationId}`);
     }
+    revalidatePath("/billing");
+    revalidatePath("/");
+    revalidatePath("/reports");
+    revalidatePath("/audit-logs");
 
     return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message || "Failed to delete transaction" };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to delete transaction" };
+  }
+}
+
+export async function restoreTransactionAction(transactionId: string) {
+  try {
+    const session = await requireAuth();
+
+    const tx = await db.transaction.findFirst({
+      where: { id: transactionId, shopId: session.shopId, isDeleted: true },
+      select: { id: true, customerId: true },
+    });
+    if (!tx) return { success: false, error: "Transaction not found or not deleted" };
+
+    await db.$transaction(async (prisma) => {
+      await prisma.transaction.update({
+        where: { id: transactionId },
+        data: {
+          isDeleted: false,
+          deletedAt: null,
+          deletedById: null,
+        },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          shopId: session.shopId,
+          userId: session.userId,
+          action: AuditAction.RESTORE,
+          entityType: "TRANSACTION",
+          entityId: transactionId,
+          transactionId,
+          previousValue: { isDeleted: true },
+          newValue: { isDeleted: false },
+          changeReason: "Transaction restored by user",
+        },
+      });
+    });
+
+    const cust = await db.customer.findUnique({
+      where: { id: tx.customerId },
+      select: { locationId: true },
+    });
+
+    if (cust) {
+      revalidatePath(`/billing/${cust.locationId}/customers/${tx.customerId}`);
+      revalidatePath(`/billing/${cust.locationId}`);
+    }
+    revalidatePath("/billing");
+    revalidatePath("/");
+    revalidatePath("/reports");
+    revalidatePath("/audit-logs");
+
+    return { success: true };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to restore transaction" };
   }
 }

@@ -1,4 +1,3 @@
-import { db } from "@/server/db";
 import { getCustomerAccountDetailsAction } from "@/server/actions/customer.actions";
 import { CustomerLedgerView } from "@/components/billing/CustomerLedgerView";
 
@@ -9,15 +8,7 @@ export default async function CustomerLedgerPage({
 }: {
   params: Promise<{ locationId: string; customerId: string }>;
 }) {
-  const { locationId, customerId } = await params;
-
-  let userId = "usr_default_01";
-  try {
-    const user = await db.user.findFirst();
-    if (user) userId = user.id;
-  } catch (error) {
-    console.error("Failed to fetch user:", error);
-  }
+  const { customerId } = await params;
 
   const res = await getCustomerAccountDetailsAction(customerId);
 
@@ -32,7 +23,7 @@ export default async function CustomerLedgerPage({
 
   return (
     <div className="p-4 sm:p-8 max-w-7xl mx-auto">
-      <CustomerLedgerView initialData={res.data as any} userId={userId} />
+      <CustomerLedgerView initialData={res.data} />
     </div>
   );
 }

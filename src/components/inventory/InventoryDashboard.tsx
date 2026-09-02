@@ -3,20 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  Boxes,
   Plus,
   PlusCircle,
   MinusCircle,
   AlertTriangle,
   Search,
-  Tag,
   History,
-  TrendingDown,
-  TrendingUp,
   FolderPlus,
-  ArrowRight,
 } from "lucide-react";
-import { formatCurrency, formatNumber, formatDate } from "@/lib/formatters";
+import { formatCurrency, formatNumber } from "@/lib/formatters";
 import {
   createCategoryAction,
   createInventoryItemAction,
@@ -25,6 +20,7 @@ import {
 } from "@/server/actions/inventory.actions";
 import { StockRemovalReason } from "@prisma/client";
 import { useTranslation } from "@/lib/i18n";
+import { useToast } from "@/components/shared/ToastContext";
 
 export interface ItemData {
   id: string;
@@ -44,13 +40,12 @@ export interface ItemData {
 export function InventoryDashboard({
   initialItems,
   initialCategories,
-  userId,
 }: {
   initialItems: ItemData[];
   initialCategories: Array<{ id: string; name: string }>;
-  userId: string;
 }) {
   const { t } = useTranslation();
+  const toast = useToast();
   const [items, setItems] = useState(initialItems);
   const [categories, setCategories] = useState(initialCategories);
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
@@ -83,25 +78,19 @@ export function InventoryDashboard({
   const [removalReason, setRemovalReason] = useState<StockRemovalReason>(StockRemovalReason.SOLD);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Filtering
   const filtered = items.filter((item) => {
     const matchesCat =
       selectedCategory === "ALL" || item.categoryId === selectedCategory;
     const matchesSearch =
-      item.name.toLowerCase().includes(search.toLowerCase()) ||
-      (item.sku && item.sku.toLowerCase().includes(search.toLowerCase()));
+      item.name.toLowerCase().includes(search.toLowerCase());
     const matchesLow = !showLowStockOnly || item.isLowStock;
     return matchesCat && matchesSearch && matchesLow;
   });
 
   const lowStockCount = items.filter((i) => i.isLowStock).length;
   const outOfStockCount = items.filter((i) => i.isOutOfStock).length;
-  const totalValuation = items.reduce(
-    (acc, i) => acc + i.currentStock * (i.purchasePrice || 0),
-    0
-  );
 
   // Create Category
   const handleCreateCategory = async (e: React.FormEvent) => {
@@ -116,6 +105,9 @@ export function InventoryDashboard({
       setCategories([...categories, { id: res.category.id, name: res.category.name }]);
       setIsAddCategoryOpen(false);
       setNewCatName("");
+      toast.success("Category added successfully");
+    } else {
+      toast.error(res.error || "Failed to create category");
     }
   };
 
@@ -124,7 +116,6 @@ export function InventoryDashboard({
     e.preventDefault();
     if (!newItemName.trim() || !newItemCatId) return;
 
-    setErrorMsg(null);
     setIsSubmitting(true);
 
     const initStock = parseFloat(newItemInitialStock) || 0;
@@ -139,7 +130,6 @@ export function InventoryDashboard({
       purchasePrice: parseFloat(newItemPurchasePrice) || undefined,
       sellingPrice: parseFloat(newItemSellingPrice) || undefined,
       initialStock: initStock,
-      createdById: userId,
     });
 
     setIsSubmitting(false);
@@ -168,8 +158,9 @@ export function InventoryDashboard({
       setNewItemPurchasePrice("");
       setNewItemSellingPrice("");
       setNewItemInitialStock("0");
+      toast.success("Inventory item added successfully");
     } else {
-      setErrorMsg(res.error || "Failed to create item");
+      toast.error(res.error || "Failed to create item");
     }
   };
 
@@ -181,7 +172,6 @@ export function InventoryDashboard({
     const qty = parseFloat(stockQty);
     if (isNaN(qty) || qty <= 0) return;
 
-    setErrorMsg(null);
     setIsSubmitting(true);
 
     const res = await addStockAction({
@@ -190,7 +180,6 @@ export function InventoryDashboard({
       supplier: stockSupplier || undefined,
       purchasePrice: parseFloat(stockPrice) || undefined,
       notes: stockNotes || undefined,
-      createdById: userId,
     });
 
     setIsSubmitting(false);
@@ -214,8 +203,9 @@ export function InventoryDashboard({
       setStockSupplier("");
       setStockPrice("");
       setStockNotes("");
+      toast.success("Stock added successfully");
     } else {
-      setErrorMsg(res.error || "Failed to add stock");
+      toast.error(res.error || "Failed to add stock");
     }
   };
 
@@ -227,7 +217,6 @@ export function InventoryDashboard({
     const qty = parseFloat(stockQty);
     if (isNaN(qty) || qty <= 0) return;
 
-    setErrorMsg(null);
     setIsSubmitting(true);
 
     const res = await removeStockAction({
@@ -235,7 +224,6 @@ export function InventoryDashboard({
       quantity: qty,
       removalReason,
       notes: stockNotes || undefined,
-      createdById: userId,
     });
 
     setIsSubmitting(false);
@@ -257,8 +245,9 @@ export function InventoryDashboard({
       setIsRemoveStockOpen(false);
       setStockQty("");
       setStockNotes("");
+      toast.success("Stock removed successfully");
     } else {
-      setErrorMsg(res.error || "Failed to remove stock");
+      toast.error(res.error || "Failed to remove stock");
     }
   };
 
@@ -293,10 +282,7 @@ export function InventoryDashboard({
           </button>
 
           <button
-            onClick={() => {
-              setErrorMsg(null);
-              setIsAddItemOpen(true);
-            }}
+            onClick={() => setIsAddItemOpen(true)}
             className="flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-slate-800 transition active:scale-98"
           >
             <Plus className="h-4 w-4 text-sky-400" />
@@ -306,10 +292,10 @@ export function InventoryDashboard({
       </div>
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
           <span className="text-xs font-semibold text-slate-500">{t("totalCatalogItems")}</span>
-          <div className="mt-1 text-2xl font-black text-slate-900">{items.length} SKUs</div>
+          <div className="mt-1 text-2xl font-black text-slate-900">{items.length}</div>
           <p className="text-[11px] text-slate-400 mt-0.5">
             {t("acrossCategories", { count: categories.length })}
           </p>
@@ -317,22 +303,14 @@ export function InventoryDashboard({
 
         <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-5 shadow-xs">
           <span className="text-xs font-bold text-amber-800">{t("lowStockAlert")}</span>
-          <div className="mt-1 text-2xl font-black text-amber-900">{lowStockCount} Items</div>
+          <div className="mt-1 text-2xl font-black text-amber-900">{lowStockCount}</div>
           <p className="text-[11px] text-amber-700 mt-0.5">{t("itemsBelowMin", { count: lowStockCount })}</p>
         </div>
 
         <div className="rounded-2xl border border-red-200 bg-red-50/70 p-5 shadow-xs">
           <span className="text-xs font-bold text-red-800">{t("outOfStock")}</span>
-          <div className="mt-1 text-2xl font-black text-red-900">{outOfStockCount} Items</div>
+          <div className="mt-1 text-2xl font-black text-red-900">{outOfStockCount}</div>
           <p className="text-[11px] text-red-600 mt-0.5">{t("needsImmediateRestocking")}</p>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-          <span className="text-xs font-semibold text-slate-500">{t("stockValuation")}</span>
-          <div className="mt-1 text-2xl font-black text-slate-900">
-            {formatCurrency(totalValuation)}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-0.5">{t("atPurchaseCost")}</p>
         </div>
       </div>
 
@@ -365,15 +343,28 @@ export function InventoryDashboard({
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showLowStockOnly}
-              onChange={(e) => setShowLowStockOnly(e.target.checked)}
-              className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-            />
-            <span>{t("lowStockOnlyFilter")}</span>
-          </label>
+          <div className="flex items-center rounded-xl border border-slate-200 bg-white p-0.5">
+            <button
+              onClick={() => setShowLowStockOnly(false)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                !showLowStockOnly
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              {t("all")} ({items.length})
+            </button>
+            <button
+              onClick={() => setShowLowStockOnly(true)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                showLowStockOnly
+                  ? "bg-amber-500 text-white shadow-xs"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              {t("lowStockOnlyFilter")} ({lowStockCount})
+            </button>
+          </div>
 
           <div className="relative flex-1 sm:w-64">
             <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
@@ -393,7 +384,7 @@ export function InventoryDashboard({
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
             <tr>
-              <th className="px-6 py-4">{t("itemNameSkuCol")}</th>
+              <th className="px-6 py-4">{t("itemNameCol")}</th>
               <th className="px-6 py-4">{t("categoryCol")}</th>
               <th className="px-6 py-4 text-center">{t("unitCol")}</th>
               <th className="px-6 py-4 text-center">{t("currentStockCol")}</th>
@@ -408,11 +399,6 @@ export function InventoryDashboard({
                 <tr key={item.id} className="hover:bg-slate-50/70 transition">
                   <td className="px-6 py-4">
                     <div className="font-extrabold text-sm text-slate-900">{item.name}</div>
-                    {item.sku && (
-                      <span className="font-mono text-[11px] font-bold text-sky-700">
-                        {item.sku}
-                      </span>
-                    )}
                   </td>
 
                   <td className="px-6 py-4 text-slate-600 font-medium">{item.categoryName}</td>
@@ -450,7 +436,6 @@ export function InventoryDashboard({
                       <button
                         onClick={() => {
                           setActiveItem(item);
-                          setErrorMsg(null);
                           setIsAddStockOpen(true);
                         }}
                         className="flex items-center gap-1 rounded-xl bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition"
@@ -462,7 +447,6 @@ export function InventoryDashboard({
                       <button
                         onClick={() => {
                           setActiveItem(item);
-                          setErrorMsg(null);
                           setIsRemoveStockOpen(true);
                         }}
                         className="flex items-center gap-1 rounded-xl bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100 transition"
@@ -531,10 +515,6 @@ export function InventoryDashboard({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
           <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-slate-900">{t("addItemModalTitle")}</h3>
-
-            {errorMsg && (
-              <div className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">{errorMsg}</div>
-            )}
 
             <form onSubmit={handleCreateItem} className="mt-4 space-y-3.5">
               <div>
@@ -669,10 +649,6 @@ export function InventoryDashboard({
               {t("currentStockDisplay", { stock: activeItem.currentStock, unit: activeItem.unit })}
             </p>
 
-            {errorMsg && (
-              <div className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">{errorMsg}</div>
-            )}
-
             <form onSubmit={handleAddStock} className="mt-4 space-y-3.5">
               <div>
                 <label className="text-xs font-bold text-slate-700">
@@ -754,10 +730,6 @@ export function InventoryDashboard({
             <p className="text-xs text-slate-500 mt-0.5">
               {t("currentStockDisplay", { stock: activeItem.currentStock, unit: activeItem.unit })}
             </p>
-
-            {errorMsg && (
-              <div className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">{errorMsg}</div>
-            )}
 
             <form onSubmit={handleRemoveStock} className="mt-4 space-y-3.5">
               <div>
