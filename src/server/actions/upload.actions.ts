@@ -9,6 +9,7 @@ import {
   getExtensionFromMimeType,
   validateImageFile,
 } from "@/lib/s3";
+import { withPerformance } from "@/lib/performance";
 
 export interface UploadResult {
   success: boolean;
@@ -20,7 +21,7 @@ export interface UploadResult {
  * Upload a bill image for a transaction.
  * The transaction must already exist and belong to the authenticated shop.
  */
-export async function uploadBillImage(
+async function uploadBillImageImpl(
   formData: FormData
 ): Promise<UploadResult> {
   const session = await requireAuth();
@@ -114,11 +115,12 @@ export async function uploadBillImage(
 
   return { success: true, billImageKey };
 }
+export const uploadBillImage = withPerformance("uploadBillImage", "action", uploadBillImageImpl);
 
 /**
  * Remove a bill image from a transaction.
  */
-export async function removeBillImage(params: {
+async function removeBillImageImpl(params: {
   transactionId: string;
   customerId: string;
 }): Promise<{ success: boolean; error?: string }> {
@@ -174,12 +176,13 @@ export async function removeBillImage(params: {
 
   return { success: true };
 }
+export const removeBillImage = withPerformance("removeBillImage", "action", removeBillImageImpl);
 
 /**
  * Get a signed URL for viewing a bill image.
  * Verifies the transaction belongs to the authenticated shop.
  */
-export async function getBillImageSignedUrl(params: {
+async function getBillImageSignedUrlImpl(params: {
   transactionId: string;
   customerId: string;
 }): Promise<{ success: boolean; url?: string; error?: string }> {
@@ -210,3 +213,4 @@ export async function getBillImageSignedUrl(params: {
     return { success: false, error: "Failed to generate image URL." };
   }
 }
+export const getBillImageSignedUrl = withPerformance("getBillImageSignedUrl", "action", getBillImageSignedUrlImpl);

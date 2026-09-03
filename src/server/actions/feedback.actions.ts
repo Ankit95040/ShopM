@@ -5,8 +5,9 @@ import { getCurrentSession } from "@/server/auth";
 import { FeedbackType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { getEmailProvider } from "@/lib/email/provider";
+import { withPerformance } from "@/lib/performance";
 
-export async function submitFeedback({
+async function submitFeedbackImpl({
   type,
   message,
   pagePath,
@@ -66,3 +67,4 @@ export async function submitFeedback({
     };
   }
 }
+export const submitFeedback = withPerformance("submitFeedback", "action", submitFeedbackImpl);

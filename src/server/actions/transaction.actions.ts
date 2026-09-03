@@ -1,11 +1,102 @@
 "use server";
 
+import { withPerformance } from "@/lib/performance";
 import { db } from "@/server/db";
-import { requireAuth } from "@/server/auth";
+import { requireAuth, resolveSession } from "@/server/auth";
 import { TransactionType, PaymentMethod, AuditAction } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { createHash } from "crypto";
 
-export async function addDebtAction({
+const SESSION_COOKIE = "shopm_session";
+const GUEST_COOKIE = "shopm_guest";
+
+function hashToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * Lightweight auth check for transaction actions.
+ * Checks ALS cache first (set by layout), then falls back to raw SQL.
+ * Same security guarantees: token hash validation, isActive checks, tenant isolation.
+ */
+async function requireAuthBasic(): Promise<{
+  userId: string;
+  shopId: string;
+  shopMemberId: string;
+  role: string;
+}> {
+  // Check ALS cache first — layout already resolved auth for this request
+  const cached = await resolveSession();
+  if (cached) {
+    return { userId: cached.userId, shopId: cached.shopId, shopMemberId: cached.shopMemberId, role: cached.role };
+  }
+
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  const guestToken = cookieStore.get(GUEST_COOKIE)?.value;
+
+  if (token) {
+    const tokenHash = hashToken(token);
+    const rows = await db.$queryRaw<
+      { userId: string; shopId: string; shopMemberId: string; role: string; expiresAt: Date; userActive: boolean; shopActive: boolean; memberActive: boolean }[]
+    >`
+      SELECT s."userId", s."shopId", s."shopMemberId", s."expiresAt",
+             u."isActive" AS "userActive",
+             sh."isActive" AS "shopActive",
+             sm."isActive" AS "memberActive", sm."role"
+      FROM "AuthSession" s
+      JOIN "User" u ON s."userId" = u.id
+      JOIN "Shop" sh ON s."shopId" = sh.id
+      JOIN "ShopMember" sm ON s."shopMemberId" = sm.id
+      WHERE s."tokenHash" = ${tokenHash}
+      LIMIT 1
+    `;
+    if (rows.length > 0) {
+      const r = rows[0];
+      if (r.expiresAt > new Date() && r.userActive && r.shopActive && r.memberActive) {
+        return { userId: r.userId, shopId: r.shopId, shopMemberId: r.shopMemberId, role: r.role };
+      }
+      // Expired or inactive — clean up
+      await db.authSession.deleteMany({ where: { tokenHash } }).catch(() => {});
+    }
+  }
+
+  // Fall back to guest session — single JOIN query instead of Prisma includes
+  if (guestToken) {
+    const guestHash = hashToken(guestToken);
+    const guestRows = await db.$queryRaw<
+      { userId: string; shopId: string; shopMemberId: string; role: string; expiresAt: Date; shopActive: boolean; isDemo: boolean; demoExpiresAt: Date | null; memberActive: boolean; userActive: boolean }[]
+    >`
+      SELECT gs."shopId", gs."expiresAt",
+             sh."isActive" AS "shopActive", sh."isDemo", sh."demoExpiresAt",
+             sm."userId", sm.id AS "shopMemberId", sm."role", sm."isActive" AS "memberActive",
+             u."isActive" AS "userActive"
+      FROM "GuestSession" gs
+      JOIN "Shop" sh ON gs."shopId" = sh.id
+      JOIN "ShopMember" sm ON gs."shopId" = sm."shopId"
+      JOIN "User" u ON sm."userId" = u.id
+      WHERE gs."tokenHash" = ${guestHash}
+      ORDER BY sm."createdAt" ASC
+      LIMIT 1
+    `;
+    if (guestRows.length > 0) {
+      const r = guestRows[0];
+      const now = new Date();
+      if (r.expiresAt > now && r.shopActive && r.isDemo && r.memberActive && r.userActive) {
+        if (!r.demoExpiresAt || r.demoExpiresAt > now) {
+          return { userId: r.userId, shopId: r.shopId, shopMemberId: r.shopMemberId, role: r.role };
+        }
+      }
+    }
+  }
+
+  // No valid session — use the standard requireAuth which handles guest creation
+  const session = await requireAuth();
+  return { userId: session.userId, shopId: session.shopId, shopMemberId: session.shopMemberId, role: session.role };
+}
+
+async function addDebtActionImpl({
   customerId,
   amount,
   billNumber,
@@ -23,10 +114,11 @@ export async function addDebtAction({
   transactionDate?: Date | string;
 }) {
   try {
-    const session = await requireAuth();
     if (!amount || amount <= 0) {
       return { success: false, error: "Amount must be greater than zero" };
     }
+
+    const session = await requireAuthBasic();
 
     const customer = await db.customer.findFirst({
       where: { id: customerId, shopId: session.shopId, isDeleted: false },
@@ -79,8 +171,9 @@ export async function addDebtAction({
     return { success: false, error: error instanceof Error ? error.message : "Failed to add debt transaction" };
   }
 }
+export const addDebtAction = withPerformance("addDebtAction", "action", addDebtActionImpl);
 
-export async function addPaymentAction({
+async function addPaymentActionImpl({
   customerId,
   amount,
   paymentMethod,
@@ -147,8 +240,9 @@ export async function addPaymentAction({
     return { success: false, error: error instanceof Error ? error.message : "Failed to add payment transaction" };
   }
 }
+export const addPaymentAction = withPerformance("addPaymentAction", "action", addPaymentActionImpl);
 
-export async function editTransactionAction({
+async function editTransactionActionImpl({
   transactionId,
   amount,
   billNumber,
@@ -255,8 +349,9 @@ export async function editTransactionAction({
     return { success: false, error: error instanceof Error ? error.message : "Failed to edit transaction" };
   }
 }
+export const editTransactionAction = withPerformance("editTransactionAction", "action", editTransactionActionImpl);
 
-export async function softDeleteTransactionAction({
+async function softDeleteTransactionActionImpl({
   transactionId,
   reason,
 }: {
@@ -316,8 +411,9 @@ export async function softDeleteTransactionAction({
     return { success: false, error: error instanceof Error ? error.message : "Failed to delete transaction" };
   }
 }
+export const softDeleteTransactionAction = withPerformance("softDeleteTransactionAction", "action", softDeleteTransactionActionImpl);
 
-export async function restoreTransactionAction(transactionId: string) {
+async function restoreTransactionActionImpl(transactionId: string) {
   try {
     const session = await requireAuth();
 
@@ -428,3 +524,4 @@ export async function restoreTransactionAction(transactionId: string) {
     return { success: false, error: error instanceof Error ? error.message : "Failed to restore transaction" };
   }
 }
+export const restoreTransactionAction = withPerformance("restoreTransactionAction", "action", restoreTransactionActionImpl);

@@ -2,8 +2,9 @@
 
 import { db } from "@/server/db";
 import { getCurrentSession, getGuestSession } from "@/server/auth";
+import { withPerformance } from "@/lib/performance";
 
-export async function copyDemoDataToShopAction() {
+async function copyDemoDataToShopActionImpl() {
   const authSession = await getCurrentSession();
   if (!authSession) {
     return { success: false, error: "You must be logged in to keep demo data." };
@@ -169,8 +170,9 @@ export async function copyDemoDataToShopAction() {
 
   return { success: true, copied: { locations: demoLocations.length, customers: demoCustomers.length, transactions: demoTransactions.length } };
 }
+export const copyDemoDataToShopAction = withPerformance("copyDemoDataToShopAction", "action", copyDemoDataToShopActionImpl);
 
-export async function getDemoDataSummaryAction() {
+async function getDemoDataSummaryActionImpl() {
   const { getCurrentSession } = await import("@/server/auth");
   const authSession = await getCurrentSession();
   if (!authSession) {
@@ -188,3 +190,4 @@ export async function getDemoDataSummaryAction() {
   const hasData = counts.some((c) => c > 0);
   return { success: true, hasDemoData: hasData, counts: { locations: counts[0], customers: counts[1], transactions: counts[2] } };
 }
+export const getDemoDataSummaryAction = withPerformance("getDemoDataSummaryAction", "action", getDemoDataSummaryActionImpl);

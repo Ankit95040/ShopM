@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { db } from "@/server/db";
 import { DashboardView, DashboardMetrics } from "@/components/dashboard/DashboardView";
 import { getEffectiveSession } from "@/server/auth";
@@ -6,11 +7,26 @@ import { KeepDemoDataBanner } from "@/components/shared/KeepDemoDataBanner";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
-  const session = await getEffectiveSession();
-  if (!session) return null;
-  const cleanName = (session.userName ?? "User").replace(/\(.*?\)/g, "").trim();
-  const userGreetingName = cleanName.split(" ")[0] || cleanName;
+function DashboardSkeleton() {
+  return (
+    <div className="p-4 sm:p-8 space-y-8 max-w-7xl mx-auto">
+      <div className="animate-pulse space-y-6">
+        <div className="h-8 w-64 bg-slate-200 rounded-lg" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-24 bg-slate-100 rounded-2xl" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="h-64 bg-slate-100 rounded-2xl" />
+          <div className="h-64 bg-slate-100 rounded-2xl" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+async function DashboardContent({ session }: { session: { shopId: string; userName: string | null } }) {
   let totalItems = 0;
   let lowStockCount = 0;
   let outOfStockCount = 0;
@@ -29,7 +45,6 @@ export default async function DashboardPage() {
 
     const [tx10, txAll, locations, items, mv10, mvAll] =
       await Promise.all([
-        // 10 most recent transactions for dashboard summary
         activeIds.length > 0
           ? db.transaction.findMany({
               where: {
@@ -45,7 +60,6 @@ export default async function DashboardPage() {
               take: 10,
             })
           : Promise.resolve([]),
-        // All transactions for View All modal
         activeIds.length > 0
           ? db.transaction.findMany({
               where: {
@@ -62,7 +76,6 @@ export default async function DashboardPage() {
           : Promise.resolve([]),
         db.location.findMany({ where: { shopId: session.shopId, isDeleted: false } }),
         db.inventoryItem.findMany({ where: { shopId: session.shopId, isDeleted: false } }),
-        // 10 most recent stock movements for dashboard summary
         db.stockMovement.findMany({
           where: { shopId: session.shopId },
           include: {
@@ -72,7 +85,6 @@ export default async function DashboardPage() {
           orderBy: { movementDate: "desc" },
           take: 10,
         }),
-        // All stock movements for View All modal
         db.stockMovement.findMany({
           where: { shopId: session.shopId },
           include: {
@@ -127,6 +139,9 @@ export default async function DashboardPage() {
     console.error("[DashboardPage] Database query error:", error);
   }
 
+  const cleanName = (session.userName ?? "User").replace(/\(.*?\)/g, "").trim();
+  const userGreetingName = cleanName.split(" ")[0] || cleanName;
+
   const dashboardData: DashboardMetrics = {
     userGreetingName,
     totalItems,
@@ -139,10 +154,19 @@ export default async function DashboardPage() {
     allMovements,
   };
 
+  return <DashboardView data={dashboardData} />;
+}
+
+export default async function DashboardPage() {
+  const session = await getEffectiveSession();
+  if (!session) return null;
+
   return (
     <HomepageShell>
       <KeepDemoDataBanner />
-      <DashboardView data={dashboardData} />
+      <Suspense fallback={<DashboardSkeleton />}>
+        <DashboardContent session={session} />
+      </Suspense>
     </HomepageShell>
   );
 }

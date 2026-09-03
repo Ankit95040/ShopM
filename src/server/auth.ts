@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import bcrypt from "bcryptjs";
 import { db } from "@/server/db";
+import { getAuthFromContext, setAuthInContext } from "@/server/auth-context";
 
 const SESSION_COOKIE = "shopm_session";
 const GUEST_COOKIE = "shopm_guest";
@@ -246,13 +247,24 @@ export async function destroyGuestSession() {
   cookieStore.delete(GUEST_COOKIE);
 }
 
-export const getEffectiveSession = cache(async (): Promise<AuthContext | null> => {
+export async function getEffectiveSession(): Promise<AuthContext | null> {
+  // Check request-scoped ALS cache first — avoids redundant DB lookups
+  const cached = getAuthFromContext();
+  if (cached) return cached;
+
   const auth = await getCurrentSession();
-  if (auth) return { ...auth, isGuest: false, isDemo: false };
+  if (auth) {
+    const session = { ...auth, isGuest: false, isDemo: false };
+    setAuthInContext(session);
+    return session;
+  }
   const guest = await getGuestSession();
-  if (guest) return guest;
+  if (guest) {
+    setAuthInContext(guest);
+    return guest;
+  }
   return null;
-});
+}
 
 export async function requireEffectiveAuth() {
   const session = await getEffectiveSession();
@@ -348,7 +360,28 @@ export async function requireAuth() {
 }
 
 export async function requireAuthStrict() {
+  // Check ALS cache first — if layout already resolved auth, reuse it
+  const cached = getAuthFromContext();
+  if (cached && !cached.isGuest) return cached;
+
   const session = await getCurrentSession();
   if (!session) redirect("/login");
+  setAuthInContext(session);
   return session;
+}
+
+/**
+ * Resolve the session for server actions.
+ * Checks ALS cache first (set by layout), then falls back to standard auth resolution.
+ * This allows requireAuthBasic() in action files to reuse the layout's auth result.
+ */
+export async function resolveSession(): Promise<AuthContext> {
+  const cached = getAuthFromContext();
+  if (cached) return cached;
+
+  const session = await getEffectiveSession();
+  if (session) return session;
+
+  // No session found — create a guest session (same as requireAuth behavior)
+  return ensureGuestSession();
 }

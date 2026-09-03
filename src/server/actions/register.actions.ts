@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { db } from "@/server/db";
 import { createSession } from "@/server/auth";
 import { getEmailProvider } from "@/lib/email/provider";
+import { withPerformance } from "@/lib/performance";
 
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 5;
@@ -48,7 +49,7 @@ export interface RegisterActionState {
 
 const INVITATION_CODE_REGEX = /^[A-Z0-9]{6,20}$/i;
 
-export async function registerValidateShopAction(
+async function registerValidateShopActionImpl(
   _state: RegisterActionState,
   formData: FormData
 ): Promise<RegisterActionState> {
@@ -101,8 +102,9 @@ export async function registerValidateShopAction(
 
   return { step: "owner", shopCode, shopName };
 }
+export const registerValidateShopAction = withPerformance("registerValidateShopAction", "action", registerValidateShopActionImpl);
 
-export async function registerValidateJoinAction(
+async function registerValidateJoinActionImpl(
   _state: RegisterActionState,
   formData: FormData
 ): Promise<RegisterActionState> {
@@ -149,8 +151,9 @@ export async function registerValidateJoinAction(
 
   return { step: "owner", shopCode, shopName: shop.name, invitationCode };
 }
+export const registerValidateJoinAction = withPerformance("registerValidateJoinAction", "action", registerValidateJoinActionImpl);
 
-export async function registerCreateOwnerAction(
+async function registerCreateOwnerActionImpl(
   _state: RegisterActionState,
   formData: FormData
 ): Promise<RegisterActionState> {
@@ -384,8 +387,9 @@ export async function registerCreateOwnerAction(
     maskedEmail: maskEmail(email),
   };
 }
+export const registerCreateOwnerAction = withPerformance("registerCreateOwnerAction", "action", registerCreateOwnerActionImpl);
 
-export async function registerCreateJoinMemberAction(
+async function registerCreateJoinMemberActionImpl(
   _state: RegisterActionState,
   formData: FormData
 ): Promise<RegisterActionState> {
@@ -522,8 +526,9 @@ export async function registerCreateJoinMemberAction(
     maskedEmail: maskEmail(email),
   };
 }
+export const registerCreateJoinMemberAction = withPerformance("registerCreateJoinMemberAction", "action", registerCreateJoinMemberActionImpl);
 
-export async function verifyRegistrationOtpAction(
+async function verifyRegistrationOtpActionImpl(
   _state: RegisterActionState,
   formData: FormData
 ): Promise<RegisterActionState> {
@@ -693,8 +698,9 @@ export async function verifyRegistrationOtpAction(
 
   return { step: "success" };
 }
+export const verifyRegistrationOtpAction = withPerformance("verifyRegistrationOtpAction", "action", verifyRegistrationOtpActionImpl);
 
-export async function resendRegistrationOtpAction(
+async function resendRegistrationOtpActionImpl(
   _state: RegisterActionState,
   formData: FormData
 ): Promise<RegisterActionState> {
@@ -807,3 +813,4 @@ export async function resendRegistrationOtpAction(
     invitationCode: invitationCode || undefined,
   };
 }
+export const resendRegistrationOtpAction = withPerformance("resendRegistrationOtpAction", "action", resendRegistrationOtpActionImpl);

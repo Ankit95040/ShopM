@@ -1,5 +1,6 @@
 "use server";
 
+import { withPerformance } from "@/lib/performance";
 import { redirect } from "next/navigation";
 import {
   authenticateWithPassword,
@@ -13,7 +14,7 @@ export interface LoginActionState {
   error?: string;
 }
 
-export async function loginAction(
+async function loginActionImpl(
   _state: LoginActionState,
   formData: FormData
 ): Promise<LoginActionState> {
@@ -43,11 +44,13 @@ export async function loginAction(
 
   redirect("/");
 }
+export const loginAction = withPerformance("loginAction", "action", loginActionImpl);
 
-export async function logoutAction() {
+async function logoutActionImpl() {
   await destroySession();
   redirect("/login");
 }
+export const logoutAction = withPerformance("logoutAction", "action", logoutActionImpl);
 
 export interface AccountDetails {
   shopName: string;
@@ -60,7 +63,7 @@ export interface AccountDetails {
   isGuest: boolean;
 }
 
-export async function getAccountDetailsAction(): Promise<AccountDetails | null> {
+async function getAccountDetailsActionImpl(): Promise<AccountDetails | null> {
   const session = await requireAuth();
   if (!session) return null;
 
@@ -87,3 +90,4 @@ export async function getAccountDetailsAction(): Promise<AccountDetails | null> 
     isGuest: session.isGuest ?? false,
   };
 }
+export const getAccountDetailsAction = withPerformance("getAccountDetailsAction", "action", getAccountDetailsActionImpl);

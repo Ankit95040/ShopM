@@ -4,6 +4,7 @@ import { randomBytes } from "crypto";
 import { db } from "@/server/db";
 import { requireAuthStrict } from "@/server/auth";
 import { UserRole } from "@prisma/client";
+import { withPerformance } from "@/lib/performance";
 
 const INVITATION_TTL_DAYS = 7;
 const CODE_LENGTH_BYTES = 4; // 8 hex chars
@@ -12,7 +13,7 @@ function generateCode(): string {
   return randomBytes(CODE_LENGTH_BYTES).toString("hex").toUpperCase();
 }
 
-export async function createShopInvitationAction({
+async function createShopInvitationActionImpl({
   role = "EMPLOYEE",
   maxUses = 1,
 }: {
@@ -56,8 +57,9 @@ export async function createShopInvitationAction({
 
   return { success: true, invitation };
 }
+export const createShopInvitationAction = withPerformance("createShopInvitationAction", "action", createShopInvitationActionImpl);
 
-export async function listShopInvitationsAction() {
+async function listShopInvitationsActionImpl() {
   const session = await requireAuthStrict();
   const invitations = await db.shopInvitation.findMany({
     where: { shopId: session.shopId },
@@ -66,8 +68,9 @@ export async function listShopInvitationsAction() {
   });
   return { success: true, invitations };
 }
+export const listShopInvitationsAction = withPerformance("listShopInvitationsAction", "action", listShopInvitationsActionImpl);
 
-export async function revokeShopInvitationAction(invitationId: string) {
+async function revokeShopInvitationActionImpl(invitationId: string) {
   const session = await requireAuthStrict();
   if (session.role !== "OWNER" && session.role !== "MANAGER") {
     return { success: false, error: "Only owners or managers can revoke invitations." };
@@ -82,8 +85,9 @@ export async function revokeShopInvitationAction(invitationId: string) {
   });
   return { success: true };
 }
+export const revokeShopInvitationAction = withPerformance("revokeShopInvitationAction", "action", revokeShopInvitationActionImpl);
 
-export async function validateInvitationCodeAction(code: string) {
+async function validateInvitationCodeActionImpl(code: string) {
   const trimmed = code.trim().toUpperCase();
   if (!trimmed) return { success: false, error: "Invitation code is required." };
   const invitation = await db.shopInvitation.findFirst({
@@ -114,3 +118,4 @@ export async function validateInvitationCodeAction(code: string) {
     },
   };
 }
+export const validateInvitationCodeAction = withPerformance("validateInvitationCodeAction", "action", validateInvitationCodeActionImpl);

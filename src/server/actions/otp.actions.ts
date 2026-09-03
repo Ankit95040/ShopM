@@ -4,6 +4,7 @@ import { createHash, randomInt } from "crypto";
 import { db } from "@/server/db";
 import { getEmailProvider } from "@/lib/email/provider";
 import bcrypt from "bcryptjs";
+import { withPerformance } from "@/lib/performance";
 
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 5;
@@ -35,7 +36,7 @@ export interface OtpActionState {
   loginId?: string;
 }
 
-export async function forgotPasswordStep1(
+async function forgotPasswordStep1Impl(
   _state: OtpActionState,
   formData: FormData
 ): Promise<OtpActionState> {
@@ -55,8 +56,9 @@ export async function forgotPasswordStep1(
 
   return { step: "loginId", shopCode };
 }
+export const forgotPasswordStep1 = withPerformance("forgotPasswordStep1", "action", forgotPasswordStep1Impl);
 
-export async function forgotPasswordStep2(
+async function forgotPasswordStep2Impl(
   _state: OtpActionState,
   formData: FormData
 ): Promise<OtpActionState> {
@@ -92,8 +94,9 @@ export async function forgotPasswordStep2(
   const maskedEmail = maskEmail(member.user.email);
   return { step: "email", shopCode, loginId, email: member.user.email, maskedEmail };
 }
+export const forgotPasswordStep2 = withPerformance("forgotPasswordStep2", "action", forgotPasswordStep2Impl);
 
-export async function sendOtpAction(
+async function sendOtpActionImpl(
   _state: OtpActionState,
   formData: FormData
 ): Promise<OtpActionState> {
@@ -193,8 +196,9 @@ export async function sendOtpAction(
     maskedEmail: maskEmail(email),
   };
 }
+export const sendOtpAction = withPerformance("sendOtpAction", "action", sendOtpActionImpl);
 
-export async function verifyOtpAction(
+async function verifyOtpActionImpl(
   _state: OtpActionState,
   formData: FormData
 ): Promise<OtpActionState> {
@@ -299,8 +303,9 @@ export async function verifyOtpAction(
 
   return { step: "password", shopCode, loginId, email };
 }
+export const verifyOtpAction = withPerformance("verifyOtpAction", "action", verifyOtpActionImpl);
 
-export async function resetPasswordAction(
+async function resetPasswordActionImpl(
   _state: OtpActionState,
   formData: FormData
 ): Promise<OtpActionState> {
@@ -419,3 +424,4 @@ export async function resetPasswordAction(
 
   return { step: "success" };
 }
+export const resetPasswordAction = withPerformance("resetPasswordAction", "action", resetPasswordActionImpl);

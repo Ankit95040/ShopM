@@ -1,11 +1,12 @@
 "use server";
 
+import { withPerformance } from "@/lib/performance";
 import { db } from "@/server/db";
 import { requireAuth } from "@/server/auth";
 import { StockMovementType, StockRemovalReason, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
-export async function createCategoryAction(name: string, description?: string) {
+async function createCategoryActionImpl(name: string, description?: string) {
   try {
     const session = await requireAuth();
     if (!name.trim()) return { success: false, error: "Category name is required" };
@@ -25,8 +26,9 @@ export async function createCategoryAction(name: string, description?: string) {
     return { success: false, error: error instanceof Error ? error.message : "Failed to create category" };
   }
 }
+export const createCategoryAction = withPerformance("createCategoryAction", "action", createCategoryActionImpl);
 
-export async function createInventoryItemAction({
+async function createInventoryItemActionImpl({
   categoryId,
   locationId,
   name,
@@ -125,8 +127,9 @@ export async function createInventoryItemAction({
     return { success: false, error: error instanceof Error ? error.message : "Failed to create inventory item" };
   }
 }
+export const createInventoryItemAction = withPerformance("createInventoryItemAction", "action", createInventoryItemActionImpl);
 
-export async function addStockAction({
+async function addStockActionImpl({
   itemId,
   quantity,
   supplier,
@@ -205,8 +208,9 @@ export async function addStockAction({
     return { success: false, error: error instanceof Error ? error.message : "Failed to add stock" };
   }
 }
+export const addStockAction = withPerformance("addStockAction", "action", addStockActionImpl);
 
-export async function removeStockAction({
+async function removeStockActionImpl({
   itemId,
   quantity,
   removalReason,
@@ -280,8 +284,9 @@ export async function removeStockAction({
     return { success: false, error: error instanceof Error ? error.message : "Failed to remove stock" };
   }
 }
+export const removeStockAction = withPerformance("removeStockAction", "action", removeStockActionImpl);
 
-export async function getInventoryAction({
+async function getInventoryActionImpl({
   categoryId,
   search,
   lowStockOnly = false,
@@ -354,8 +359,9 @@ export async function getInventoryAction({
     return { success: false, error: error instanceof Error ? error.message : "Failed to fetch inventory" };
   }
 }
+export const getInventoryAction = withPerformance("getInventoryAction", "action", getInventoryActionImpl);
 
-export async function getStockMovementsAction(itemId?: string) {
+async function getStockMovementsActionImpl(itemId?: string) {
   try {
     const session = await requireAuth();
     const movements = await db.stockMovement.findMany({
@@ -392,3 +398,4 @@ export async function getStockMovementsAction(itemId?: string) {
     return { success: false, error: error instanceof Error ? error.message : "Failed to fetch stock movements" };
   }
 }
+export const getStockMovementsAction = withPerformance("getStockMovementsAction", "action", getStockMovementsActionImpl);

@@ -1,5 +1,6 @@
 "use server";
 
+import { withPerformance } from "@/lib/performance";
 import { db } from "@/server/db";
 import { requireAuth } from "@/server/auth";
 import { calculatePeriodReport, getPeriodDates, PeriodReport } from "@/lib/accounting";
@@ -46,7 +47,7 @@ export interface ReportData {
   availableMonths: Array<{ key: string; label: string }>;
 }
 
-export async function getReportData(params?: {
+async function getReportDataImpl(params?: {
   month?: string;
   customerId?: string;
 }): Promise<ReportData> {
@@ -186,6 +187,7 @@ export async function getReportData(params?: {
     availableMonths,
   };
 }
+export const getReportData = withPerformance("getReportData", "action", getReportDataImpl);
 
 async function calculateInventoryPeriodReport(
   shopId: string,
