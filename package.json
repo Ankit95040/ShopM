@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "dotenvx run --convention=nextjs -- next dev",
-    "build": "dotenvx run --convention=nextjs -- next build",
+    "build": "prisma generate && dotenvx run --convention=nextjs -- next build",
     "start": "dotenvx run --convention=nextjs -- next start",
     "lint": "eslint"
   },
