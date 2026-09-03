@@ -1,12 +1,13 @@
 import { db } from "@/server/db";
 import { DashboardView, DashboardMetrics } from "@/components/dashboard/DashboardView";
-import { getCurrentSession } from "@/server/auth";
+import { getEffectiveSession } from "@/server/auth";
 import { HomepageShell } from "@/components/shared/HomepageShell";
+import { KeepDemoDataBanner } from "@/components/shared/KeepDemoDataBanner";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const session = await getCurrentSession();
+  const session = await getEffectiveSession();
   if (!session) return null;
   const cleanName = (session.userName ?? "User").replace(/\(.*?\)/g, "").trim();
   const userGreetingName = cleanName.split(" ")[0] || cleanName;
@@ -140,6 +141,7 @@ export default async function DashboardPage() {
 
   return (
     <HomepageShell>
+      <KeepDemoDataBanner />
       <DashboardView data={dashboardData} />
     </HomepageShell>
   );

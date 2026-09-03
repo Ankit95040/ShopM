@@ -1,16 +1,18 @@
 import { Navbar } from "@/components/shared/Navbar";
 import { ToastProvider } from "@/components/shared/ToastContext";
-import { requireAuth } from "@/server/auth";
+import { DemoBanner } from "@/components/shared/DemoBanner";
+import { requireEffectiveAuth } from "@/server/auth";
 
 export default async function ProtectedLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await requireAuth();
+  const session = await requireEffectiveAuth();
 
   return (
     <ToastProvider>
+      {session.isGuest && <DemoBanner />}
       <Navbar userName={session.userName} role={session.role} />
       <main className="flex-1">{children}</main>
     </ToastProvider>

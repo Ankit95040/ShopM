@@ -6,7 +6,9 @@ import bcrypt from "bcryptjs";
 import { db } from "@/server/db";
 
 const SESSION_COOKIE = "shopm_session";
+const GUEST_COOKIE = "shopm_guest";
 const SESSION_TTL_DAYS = 7;
+const GUEST_TTL_DAYS = 1;
 
 export interface AuthContext {
   userId: string;
@@ -17,6 +19,8 @@ export interface AuthContext {
   userName: string;
   shopName: string;
   shopCode: string;
+  isGuest?: boolean;
+  isDemo?: boolean;
 }
 
 function hashSessionToken(token: string) {
@@ -74,6 +78,190 @@ export async function destroySession() {
   }
 
   cookieStore.delete(SESSION_COOKIE);
+}
+
+// Guest/demo session helpers — isolated per-browser demo shop
+// Creates guest DB records only — does NOT set cookies.
+// Use setGuestSessionCookie() separately in a Route Handler or Server Action.
+export async function createGuestSessionData(): Promise<{
+  token: string;
+  expiresAt: Date;
+  context: AuthContext;
+}> {
+  const token = randomBytes(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + GUEST_TTL_DAYS * 24 * 60 * 60 * 1000);
+  const shopCode = `DEMO-${randomBytes(3).toString("hex").toUpperCase()}`;
+  const shopName = "Demo Shop";
+  const guestUserName = "Demo User";
+  const guestLoginId = `guest_${randomBytes(4).toString("hex")}`;
+  const passwordHash = await bcrypt.hash(randomBytes(16).toString("hex"), 12);
+
+  const shop = await db.shop.create({
+    data: {
+      shopCode,
+      name: shopName,
+      isActive: true,
+      isDemo: true,
+      demoExpiresAt: expiresAt,
+    },
+  });
+
+  const user = await db.user.create({
+    data: {
+      name: guestUserName,
+      passwordHash,
+      isActive: true,
+    },
+  });
+
+  const member = await db.shopMember.create({
+    data: {
+      shopId: shop.id,
+      userId: user.id,
+      loginId: guestLoginId,
+      role: "OWNER",
+    },
+  });
+
+  await db.guestSession.create({
+    data: {
+      tokenHash: hashSessionToken(token),
+      shopId: shop.id,
+      expiresAt,
+    },
+  });
+
+  return {
+    token,
+    expiresAt,
+    context: {
+      userId: user.id,
+      shopId: shop.id,
+      shopMemberId: member.id,
+      loginId: member.loginId,
+      role: member.role,
+      userName: user.name,
+      shopName: shop.name,
+      shopCode: shop.shopCode,
+      isGuest: true,
+      isDemo: true,
+    },
+  };
+}
+
+// Sets the guest session cookie. Must be called from a Server Action or Route Handler.
+export async function setGuestSessionCookie(
+  token: string,
+  expiresAt: Date,
+): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.set(GUEST_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    expires: expiresAt,
+  });
+}
+
+// Convenience: create DB records + set cookie. Only call from Server Actions or Route Handlers.
+export async function createGuestSession(): Promise<AuthContext> {
+  const { token, expiresAt, context } = await createGuestSessionData();
+  await setGuestSessionCookie(token, expiresAt);
+  return context;
+}
+
+export const getGuestSession = cache(async (): Promise<AuthContext | null> => {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(GUEST_COOKIE)?.value;
+  if (!token) return null;
+
+  const tokenHash = hashSessionToken(token);
+  const guest = await db.guestSession.findUnique({
+    where: { tokenHash },
+    include: { shop: true },
+  });
+
+  if (!guest || guest.expiresAt <= new Date()) {
+    if (guest) {
+      await db.guestSession.delete({ where: { id: guest.id } }).catch(() => undefined);
+      // Cleanup expired demo shop (cascade deletes members, locations, etc.)
+      if (guest.shop.isDemo) {
+        await db.shop.delete({ where: { id: guest.shopId } }).catch(() => undefined);
+      }
+    }
+    return null;
+  }
+
+  if (!constantTimeEqual(guest.tokenHash, tokenHash)) return null;
+  if (!guest.shop.isActive || !guest.shop.isDemo) return null;
+  if (guest.shop.demoExpiresAt && guest.shop.demoExpiresAt <= new Date()) {
+    await db.guestSession.delete({ where: { id: guest.id } }).catch(() => undefined);
+    await db.shop.delete({ where: { id: guest.shopId } }).catch(() => undefined);
+    return null;
+  }
+
+  // Fetch the demo member/user for this shop (first OWNER member)
+  const member = await db.shopMember.findFirst({
+    where: { shopId: guest.shopId },
+    include: { user: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (!member || !member.user.isActive) return null;
+
+  return {
+    userId: member.userId,
+    shopId: guest.shopId,
+    shopMemberId: member.id,
+    loginId: member.loginId,
+    role: member.role,
+    userName: member.user.name,
+    shopName: guest.shop.name,
+    shopCode: guest.shop.shopCode,
+    isGuest: true,
+    isDemo: true,
+  };
+});
+
+export async function ensureGuestSession(): Promise<AuthContext> {
+  const existing = await getGuestSession();
+  if (existing) return existing;
+  return createGuestSession();
+}
+
+export async function destroyGuestSession() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(GUEST_COOKIE)?.value;
+  if (token) {
+    const tokenHash = hashSessionToken(token);
+    const guest = await db.guestSession.findUnique({ where: { tokenHash } });
+    if (guest) {
+      await db.guestSession.delete({ where: { id: guest.id } }).catch(() => undefined);
+      const shop = await db.shop.findUnique({ where: { id: guest.shopId } });
+      if (shop?.isDemo) {
+        await db.shop.delete({ where: { id: guest.shopId } }).catch(() => undefined);
+      }
+    }
+  }
+  cookieStore.delete(GUEST_COOKIE);
+}
+
+export const getEffectiveSession = cache(async (): Promise<AuthContext | null> => {
+  const auth = await getCurrentSession();
+  if (auth) return { ...auth, isGuest: false, isDemo: false };
+  const guest = await getGuestSession();
+  if (guest) return guest;
+  return null;
+});
+
+export async function requireEffectiveAuth() {
+  const session = await getEffectiveSession();
+  if (!session) {
+    // No auth and no guest — redirect to the Route Handler that creates the guest session.
+    // Cannot call cookies().set() from a Server Component, so this must go through a Route Handler.
+    redirect("/api/guest/create");
+  }
+  return session;
 }
 
 export async function authenticateWithPassword({
@@ -151,6 +339,15 @@ export const getCurrentSession = cache(async (): Promise<AuthContext | null> => 
 });
 
 export async function requireAuth() {
+  const session = await getEffectiveSession();
+  if (!session) {
+    // No auth and no guest — create a demo guest session on-demand
+    return ensureGuestSession();
+  }
+  return session;
+}
+
+export async function requireAuthStrict() {
   const session = await getCurrentSession();
   if (!session) redirect("/login");
   return session;

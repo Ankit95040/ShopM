@@ -224,6 +224,12 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
         </Link>
       </div>
 
+      <div className="flex justify-end">
+        <Link href="/members" className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 transition">
+          Manage Team <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+
       {/* DASHBOARD CONTENT: Recent Transactions + Inventory Summary */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Recent Transactions Section */}

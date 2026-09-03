@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "dotenvx run --convention=nextjs -- next dev",
+    "build": "dotenvx run --convention=nextjs -- next build",
+    "start": "dotenvx run --convention=nextjs -- next start",
     "lint": "eslint"
   },
   "dependencies": {
@@ -28,6 +28,7 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@dotenvx/dotenvx": "^2.23.0",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",

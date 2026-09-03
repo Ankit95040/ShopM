@@ -6,23 +6,30 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-const s3Config = {
-  endpoint: process.env.S3_ENDPOINT || "",
-  region: "auto",
-  credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY_ID || "",
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
-  },
-};
+function getS3Config() {
+  return {
+    endpoint: process.env.S3_ENDPOINT || "",
+    region: "auto" as const,
+    credentials: {
+      accessKeyId: process.env.S3_ACCESS_KEY_ID || "",
+      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
+    },
+  };
+}
 
-const BUCKET_NAME = process.env.S3_BUCKET_NAME || "";
-const PUBLIC_DOMAIN = process.env.S3_PUBLIC_DOMAIN || "";
+function getBucketName(): string {
+  return process.env.S3_BUCKET_NAME || "";
+}
+
+function getPublicDomain(): string {
+  return process.env.S3_PUBLIC_DOMAIN || "";
+}
 
 function getS3Client(): S3Client {
   if (!process.env.S3_ENDPOINT || !process.env.S3_ACCESS_KEY_ID) {
-    throw new Error("S3 credentials not configured. Set S3_ENDPOINT, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY in .env");
+    throw new Error("S3 credentials not configured. Set S3_ENDPOINT, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY in .env.local (use dotenvx run if values are encrypted)");
   }
-  return new S3Client(s3Config);
+  return new S3Client(getS3Config());
 }
 
 /**
@@ -82,7 +89,7 @@ export async function uploadToR2(params: {
   const client = getS3Client();
 
   const command = new PutObjectCommand({
-    Bucket: BUCKET_NAME,
+    Bucket: getBucketName(),
     Key: key,
     Body: body,
     ContentType: contentType,
@@ -101,7 +108,7 @@ export async function deleteFromR2(key: string): Promise<void> {
   const client = getS3Client();
 
   const command = new DeleteObjectCommand({
-    Bucket: BUCKET_NAME,
+    Bucket: getBucketName(),
     Key: key,
   });
 
@@ -120,7 +127,7 @@ export async function getSignedReadUrl(
   const client = getS3Client();
 
   const command = new GetObjectCommand({
-    Bucket: BUCKET_NAME,
+    Bucket: getBucketName(),
     Key: key,
   });
 
@@ -133,8 +140,9 @@ export async function getSignedReadUrl(
  */
 export async function getBillImageUrl(key: string): Promise<string> {
   if (!key) return "";
-  if (PUBLIC_DOMAIN) {
-    return `${PUBLIC_DOMAIN}/${key}`;
+  const publicDomain = getPublicDomain();
+  if (publicDomain) {
+    return `${publicDomain}/${key}`;
   }
   return getSignedReadUrl(key);
 }

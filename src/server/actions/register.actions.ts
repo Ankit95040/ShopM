@@ -43,7 +43,10 @@ export interface RegisterActionState {
   userName?: string;
   email?: string;
   maskedEmail?: string;
+  invitationCode?: string;
 }
+
+const INVITATION_CODE_REGEX = /^[A-Z0-9]{6,20}$/i;
 
 export async function registerValidateShopAction(
   _state: RegisterActionState,
@@ -53,20 +56,21 @@ export async function registerValidateShopAction(
   const shopName = String(formData.get("shopName") || "").trim();
 
   if (!shopName || shopName.length < 2) {
-    return { step: "shop", error: "Shop name must be at least 2 characters." };
+    return { step: "shop", shopCode, shopName, error: "Shop name must be at least 2 characters." };
   }
 
   if (shopName.length > 100) {
-    return { step: "shop", error: "Shop name must be 100 characters or fewer." };
+    return { step: "shop", shopCode, shopName, error: "Shop name must be 100 characters or fewer." };
   }
 
   if (!shopCode) {
-    return { step: "shop", shopName, error: "Shop ID is required." };
+    return { step: "shop", shopCode, shopName, error: "Shop ID is required." };
   }
 
   if (shopCode.length < SHOP_CODE_MIN || shopCode.length > SHOP_CODE_MAX) {
     return {
       step: "shop",
+      shopCode,
       shopName,
       error: `Shop ID must be ${SHOP_CODE_MIN}-${SHOP_CODE_MAX} characters.`,
     };
@@ -75,6 +79,7 @@ export async function registerValidateShopAction(
   if (!SHOP_CODE_REGEX.test(shopCode)) {
     return {
       step: "shop",
+      shopCode,
       shopName,
       error: "Shop ID can only contain letters, numbers, and hyphens.",
     };
@@ -88,12 +93,61 @@ export async function registerValidateShopAction(
   if (existing) {
     return {
       step: "shop",
+      shopCode,
       shopName,
       error: "This Shop ID is already taken. Please choose a different one.",
     };
   }
 
   return { step: "owner", shopCode, shopName };
+}
+
+export async function registerValidateJoinAction(
+  _state: RegisterActionState,
+  formData: FormData
+): Promise<RegisterActionState> {
+  const shopCode = String(formData.get("shopCode") || "").trim();
+  const invitationCode = String(formData.get("invitationCode") || "").trim().toUpperCase();
+
+  if (!shopCode) {
+    return { step: "shop", shopCode, invitationCode, error: "Shop ID is required." };
+  }
+  if (!invitationCode) {
+    return { step: "shop", shopCode, invitationCode, error: "Invitation code is required." };
+  }
+  if (!INVITATION_CODE_REGEX.test(invitationCode)) {
+    return { step: "shop", shopCode, invitationCode, error: "Invalid invitation code format." };
+  }
+
+  const shop = await db.shop.findFirst({
+    where: { shopCode, isActive: true },
+    select: { id: true, name: true, isDemo: true },
+  });
+  if (!shop) {
+    return { step: "shop", shopCode, invitationCode, error: "Shop not found or not active." };
+  }
+  if (shop.isDemo) {
+    return { step: "shop", shopCode, invitationCode, error: "Cannot join a demo shop." };
+  }
+
+  const invitation = await db.shopInvitation.findFirst({
+    where: { code: invitationCode, isActive: true },
+    select: { id: true, shopId: true, expiresAt: true, usedCount: true, maxUses: true, isActive: true, role: true },
+  });
+  if (!invitation || !invitation.isActive) {
+    return { step: "shop", shopCode, invitationCode, error: "Invalid or revoked invitation code." };
+  }
+  if (invitation.shopId !== shop.id) {
+    return { step: "shop", shopCode, invitationCode, error: "Invitation code does not belong to this Shop ID." };
+  }
+  if (invitation.expiresAt <= new Date()) {
+    return { step: "shop", shopCode, invitationCode, error: "Invitation has expired." };
+  }
+  if (invitation.usedCount >= invitation.maxUses) {
+    return { step: "shop", shopCode, invitationCode, error: "Invitation has already been used." };
+  }
+
+  return { step: "owner", shopCode, shopName: shop.name, invitationCode };
 }
 
 export async function registerCreateOwnerAction(
@@ -113,6 +167,9 @@ export async function registerCreateOwnerAction(
       step: "owner",
       shopCode,
       shopName,
+      userName,
+      loginId,
+      email,
       error: "Full name must be at least 2 characters.",
     };
   }
@@ -123,6 +180,8 @@ export async function registerCreateOwnerAction(
       shopCode,
       shopName,
       userName,
+      loginId,
+      email,
       error: "User ID is required.",
     };
   }
@@ -133,6 +192,8 @@ export async function registerCreateOwnerAction(
       shopCode,
       shopName,
       userName,
+      loginId,
+      email,
       error: `User ID must be ${LOGIN_ID_MIN}-${LOGIN_ID_MAX} characters.`,
     };
   }
@@ -143,6 +204,8 @@ export async function registerCreateOwnerAction(
       shopCode,
       shopName,
       userName,
+      loginId,
+      email,
       error: "User ID can only contain letters, numbers, underscores, and hyphens.",
     };
   }
@@ -154,6 +217,7 @@ export async function registerCreateOwnerAction(
       shopName,
       userName,
       loginId,
+      email,
       error: "Please enter a valid email address.",
     };
   }
@@ -182,21 +246,38 @@ export async function registerCreateOwnerAction(
     };
   }
 
-  // Check for duplicate email (global)
-  const existingEmail = await db.user.findFirst({
+  // Check for duplicate email (global) — distinguish active vs pending
+  const existingUser = await db.user.findFirst({
     where: { email },
-    select: { id: true },
+    select: { id: true, isActive: true, emailVerified: true },
   });
 
-  if (existingEmail) {
-    return {
-      step: "owner",
-      shopCode,
-      shopName,
-      userName,
-      loginId,
-      error: "This email is already registered. Please use a different email.",
-    };
+  if (existingUser) {
+    const isPending = !existingUser.isActive && !existingUser.emailVerified;
+    if (!isPending) {
+      return {
+        step: "owner",
+        shopCode,
+        shopName,
+        userName,
+        loginId,
+        email,
+        error: "This email is already registered. Please use a different email.",
+      };
+    }
+    // Pending abandoned registration — clean up so it can be retried.
+    // Safe to delete: isActive=false, emailVerified=null, no verified data.
+    const pendingMembers = await db.shopMember.findMany({
+      where: { userId: existingUser.id },
+      select: { shopId: true },
+    });
+    const pendingShopIds = pendingMembers.map((m) => m.shopId);
+    await db.$transaction(async (tx) => {
+      if (pendingShopIds.length) {
+        await tx.shop.deleteMany({ where: { id: { in: pendingShopIds } } });
+      }
+      await tx.user.delete({ where: { id: existingUser.id } });
+    });
   }
 
   // Re-verify shop code uniqueness (race condition protection)
@@ -208,6 +289,8 @@ export async function registerCreateOwnerAction(
   if (existingShop) {
     return {
       step: "shop",
+      shopCode,
+      shopName,
       error: "This Shop ID was just taken. Please choose a different one.",
     };
   }
@@ -302,6 +385,144 @@ export async function registerCreateOwnerAction(
   };
 }
 
+export async function registerCreateJoinMemberAction(
+  _state: RegisterActionState,
+  formData: FormData
+): Promise<RegisterActionState> {
+  const shopCode = String(formData.get("shopCode") || "").trim();
+  const invitationCode = String(formData.get("invitationCode") || "").trim().toUpperCase();
+  const shopName = String(formData.get("shopName") || "").trim();
+  const userName = String(formData.get("userName") || "").trim();
+  const loginId = String(formData.get("loginId") || "").trim();
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const password = String(formData.get("password") || "");
+  const confirmPassword = String(formData.get("confirmPassword") || "");
+
+  if (!shopCode || !invitationCode) {
+    return { step: "shop", shopCode, invitationCode, error: "Shop ID and invitation code are required." };
+  }
+
+  if (!userName || userName.length < 2) {
+    return { step: "owner", shopCode, shopName, invitationCode, userName, loginId, email, error: "Full name must be at least 2 characters." };
+  }
+  if (!loginId) {
+    return { step: "owner", shopCode, shopName, invitationCode, userName, loginId, email, error: "User ID is required." };
+  }
+  if (loginId.length < LOGIN_ID_MIN || loginId.length > LOGIN_ID_MAX) {
+    return { step: "owner", shopCode, shopName, invitationCode, userName, loginId, email, error: `User ID must be ${LOGIN_ID_MIN}-${LOGIN_ID_MAX} characters.` };
+  }
+  if (!LOGIN_ID_REGEX.test(loginId)) {
+    return { step: "owner", shopCode, shopName, invitationCode, userName, loginId, email, error: "User ID can only contain letters, numbers, underscores, and hyphens." };
+  }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { step: "owner", shopCode, shopName, invitationCode, userName, loginId, email, error: "Please enter a valid email address." };
+  }
+  if (!password || password.length < PASSWORD_MIN) {
+    return { step: "owner", shopCode, shopName, invitationCode, userName, loginId, email, error: `Password must be at least ${PASSWORD_MIN} characters.` };
+  }
+  if (password !== confirmPassword) {
+    return { step: "owner", shopCode, shopName, invitationCode, userName, loginId, email, error: "Passwords do not match." };
+  }
+
+  // Verify shop and invitation again
+  const shop = await db.shop.findFirst({ where: { shopCode, isActive: true }, select: { id: true, name: true, isDemo: true } });
+  if (!shop) {
+    return { step: "shop", shopCode, invitationCode, error: "Shop not found or not active." };
+  }
+  if (shop.isDemo) {
+    return { step: "shop", shopCode, invitationCode, error: "Cannot join a demo shop." };
+  }
+  const invitation = await db.shopInvitation.findFirst({
+    where: { code: invitationCode },
+    select: { id: true, shopId: true, expiresAt: true, usedCount: true, maxUses: true, isActive: true, role: true },
+  });
+  if (!invitation || !invitation.isActive) {
+    return { step: "shop", shopCode, invitationCode, error: "Invalid or revoked invitation code." };
+  }
+  if (invitation.shopId !== shop.id) {
+    return { step: "shop", shopCode, invitationCode, error: "Invitation does not belong to this Shop ID." };
+  }
+  if (invitation.expiresAt <= new Date()) {
+    return { step: "shop", shopCode, invitationCode, error: "Invitation has expired." };
+  }
+  if (invitation.usedCount >= invitation.maxUses) {
+    return { step: "shop", shopCode, invitationCode, error: "Invitation has already been used." };
+  }
+
+  // Check duplicate email (global) — same pending logic as create
+  const existingUser = await db.user.findFirst({ where: { email }, select: { id: true, isActive: true, emailVerified: true } });
+  if (existingUser) {
+    const isPending = !existingUser.isActive && !existingUser.emailVerified;
+    if (!isPending) {
+      return { step: "owner", shopCode, shopName: shop.name, invitationCode, userName, loginId, email, error: "This email is already registered. Please use a different email." };
+    }
+    const pendingMembers = await db.shopMember.findMany({ where: { userId: existingUser.id }, select: { shopId: true } });
+    const pendingShopIds = pendingMembers.map((m) => m.shopId);
+    await db.$transaction(async (tx) => {
+      if (pendingShopIds.length) {
+        await tx.shop.deleteMany({ where: { id: { in: pendingShopIds } } });
+      }
+      await tx.user.delete({ where: { id: existingUser.id } });
+    });
+  }
+
+  // Check duplicate loginId within this shop
+  const existingLogin = await db.shopMember.findFirst({ where: { shopId: shop.id, loginId }, select: { id: true } });
+  if (existingLogin) {
+    return { step: "owner", shopCode, shopName: shop.name, invitationCode, userName, loginId, email, error: "This User ID is already taken in this shop. Choose another." };
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  const result = await db.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: { name: userName, email, passwordHash, isActive: false },
+    });
+    const member = await tx.shopMember.create({
+      data: { shopId: shop.id, userId: user.id, loginId, role: invitation.role },
+    });
+    return { user, member, shop };
+  });
+
+  const otp = generateOtp();
+  const otpHash = hashOtp(otp);
+  const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60_000);
+
+  await db.otpToken.updateMany({
+    where: { userId: result.user.id, purpose: "registration", usedAt: null },
+    data: { usedAt: new Date() },
+  });
+  await db.otpToken.create({
+    data: { userId: result.user.id, email, otpHash, purpose: "registration", expiresAt, maxAttempts: OTP_MAX_ATTEMPTS },
+  });
+
+  const emailProvider = getEmailProvider();
+  const sendResult = await emailProvider.sendOtpEmail({ to: email, otp, userName });
+  if (!sendResult.success) {
+    return {
+      step: "owner",
+      shopCode,
+      shopName: shop.name,
+      invitationCode,
+      userName,
+      loginId,
+      email,
+      error: sendResult.error || "Failed to send verification email. Please try again.",
+    };
+  }
+
+  return {
+    step: "otp",
+    shopCode,
+    shopName: shop.name,
+    invitationCode,
+    loginId,
+    userName,
+    email,
+    maskedEmail: maskEmail(email),
+  };
+}
+
 export async function verifyRegistrationOtpAction(
   _state: RegisterActionState,
   formData: FormData
@@ -310,6 +531,7 @@ export async function verifyRegistrationOtpAction(
   const loginId = String(formData.get("loginId") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const otp = String(formData.get("otp") || "").trim();
+  const invitationCode = String(formData.get("invitationCode") || "").trim().toUpperCase();
 
   if (!otp || otp.length !== OTP_LENGTH) {
     return {
@@ -318,6 +540,7 @@ export async function verifyRegistrationOtpAction(
       loginId,
       email,
       maskedEmail: maskEmail(email),
+      invitationCode: invitationCode || undefined,
       error: `Please enter a ${OTP_LENGTH}-digit verification code.`,
     };
   }
@@ -335,6 +558,7 @@ export async function verifyRegistrationOtpAction(
       loginId,
       email,
       maskedEmail: maskEmail(email),
+      invitationCode: invitationCode || undefined,
       error: "Account not found. Please start over.",
     };
   }
@@ -358,6 +582,7 @@ export async function verifyRegistrationOtpAction(
       loginId,
       email,
       maskedEmail: maskEmail(email),
+      invitationCode: invitationCode || undefined,
       error: "OTP has expired or was not found. Please request a new one.",
     };
   }
@@ -374,6 +599,7 @@ export async function verifyRegistrationOtpAction(
       loginId,
       email,
       maskedEmail: maskEmail(email),
+      invitationCode: invitationCode || undefined,
       error: "Too many failed attempts. Please request a new OTP.",
     };
   }
@@ -391,6 +617,7 @@ export async function verifyRegistrationOtpAction(
       loginId,
       email,
       maskedEmail: maskEmail(email),
+      invitationCode: invitationCode || undefined,
       error: `Incorrect code. ${otpRecord.maxAttempts - otpRecord.attempts - 1} attempts remaining.`,
     };
   }
@@ -418,6 +645,7 @@ export async function verifyRegistrationOtpAction(
       loginId,
       email,
       maskedEmail: maskEmail(email),
+      invitationCode: invitationCode || undefined,
       error: "Account not found. Please start over.",
     };
   }
@@ -435,6 +663,25 @@ export async function verifyRegistrationOtpAction(
       where: { id: member.shopId },
       data: { isActive: true },
     });
+
+    if (invitationCode) {
+      const inv = await tx.shopInvitation.findFirst({
+        where: { code: invitationCode, shopId: member.shopId },
+        select: { id: true, usedCount: true, maxUses: true },
+      });
+      if (inv && inv.usedCount < inv.maxUses) {
+        await tx.shopInvitation.update({
+          where: { id: inv.id },
+          data: { usedCount: { increment: 1 } },
+        });
+        if (inv.usedCount + 1 >= inv.maxUses) {
+          await tx.shopInvitation.update({
+            where: { id: inv.id },
+            data: { isActive: false },
+          });
+        }
+      }
+    }
   });
 
   // Create authenticated session
@@ -454,12 +701,14 @@ export async function resendRegistrationOtpAction(
   const shopCode = String(formData.get("shopCode") || "").trim();
   const loginId = String(formData.get("loginId") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
+  const invitationCode = String(formData.get("invitationCode") || "").trim().toUpperCase();
 
   if (!email) {
     return {
       step: "otp",
       shopCode,
       loginId,
+      invitationCode: invitationCode || undefined,
       error: "Email is required.",
     };
   }
@@ -476,6 +725,7 @@ export async function resendRegistrationOtpAction(
       loginId,
       email,
       maskedEmail: maskEmail(email),
+      invitationCode: invitationCode || undefined,
       error: "Account not found. Please start over.",
     };
   }
@@ -497,6 +747,7 @@ export async function resendRegistrationOtpAction(
       loginId,
       email,
       maskedEmail: maskEmail(email),
+      invitationCode: invitationCode || undefined,
       error: "Too many requests. Please wait a minute before trying again.",
     };
   }
@@ -542,6 +793,7 @@ export async function resendRegistrationOtpAction(
       loginId,
       email,
       maskedEmail: maskEmail(email),
+      invitationCode: invitationCode || undefined,
       error: sendResult.error || "Failed to send verification email. Please try again.",
     };
   }
@@ -552,5 +804,6 @@ export async function resendRegistrationOtpAction(
     loginId,
     email,
     maskedEmail: maskEmail(email),
+    invitationCode: invitationCode || undefined,
   };
 }

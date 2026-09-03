@@ -1,5 +1,6 @@
 import { defineConfig } from "@prisma/config";
-import "dotenv/config";
+import { config as loadEnv } from "@dotenvx/dotenvx";
+loadEnv({ convention: "nextjs", quiet: true });
 
 export default defineConfig({
   schema: "./prisma/schema.prisma",

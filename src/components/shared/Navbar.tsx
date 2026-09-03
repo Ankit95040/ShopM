@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -16,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useTranslation, TranslationKey } from "@/lib/i18n";
 import { logoutAction } from "@/server/actions/auth.actions";
+import { AccountDetailsModal } from "@/components/shared/AccountDetailsModal";
 
 interface NavItemConfig {
   key: TranslationKey;
@@ -46,6 +48,7 @@ export function Navbar({
   const pathname = usePathname();
   const { language, toggleLanguage, t } = useTranslation();
   const displayName = cleanDisplayName(userName);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 backdrop-blur shadow-xs">
@@ -143,7 +146,11 @@ export function Navbar({
 
           {displayName && (
             <>
-              <div className="hidden md:inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full bg-slate-100 px-3 border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setIsAccountOpen(true)}
+                className="hidden md:inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full bg-slate-100 px-3 border border-slate-200 hover:bg-slate-200 transition cursor-pointer"
+              >
                 <User className="h-3.5 w-3.5 shrink-0 text-slate-600" />
                 <span className="text-xs font-semibold leading-none text-slate-800 whitespace-nowrap">
                   {displayName}
@@ -153,7 +160,7 @@ export function Navbar({
                     </span>
                   ) : null}
                 </span>
-              </div>
+              </button>
 
               <form action={logoutAction} className="shrink-0">
                 <button
@@ -192,7 +199,20 @@ export function Navbar({
             </Link>
           );
         })}
+        {displayName && (
+          <button
+            type="button"
+            onClick={() => setIsAccountOpen(true)}
+            className="inline-flex flex-col items-center justify-center gap-0.5 whitespace-nowrap rounded-lg px-2 py-1.5 text-[10px] font-bold leading-none min-w-0 flex-1 text-slate-600"
+          >
+            <User className="h-4 w-4 shrink-0" />
+            <span className="whitespace-nowrap leading-none truncate">{t("account")}</span>
+          </button>
+        )}
       </div>
+
+      {/* Account Details Modal */}
+      <AccountDetailsModal isOpen={isAccountOpen} onClose={() => setIsAccountOpen(false)} />
     </header>
   );
 }

@@ -1,7 +1,7 @@
 import { getCustomersByLocationAction } from "@/server/actions/customer.actions";
 import { CustomerTable } from "@/components/billing/CustomerTable";
 import { db } from "@/server/db";
-import { getCurrentSession } from "@/server/auth";
+import { getEffectiveSession } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,7 @@ export default async function LocationCustomersPage({
   params: Promise<{ locationId: string }>;
 }) {
   const { locationId } = await params;
-  const session = await getCurrentSession();
+  const session = await getEffectiveSession();
   if (!session) return null;
 
   let location = null;

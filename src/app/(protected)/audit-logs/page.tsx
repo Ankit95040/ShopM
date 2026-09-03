@@ -1,7 +1,7 @@
 import { db } from "@/server/db";
 import { AuditLogsView, AuditLogItem } from "@/components/audit/AuditLogsView";
 import { Prisma } from "@prisma/client";
-import { getCurrentSession } from "@/server/auth";
+import { getEffectiveSession } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,7 @@ type AuditLogWithUser = Prisma.AuditLogGetPayload<{
 }>;
 
 export default async function AuditLogsPage() {
-  const session = await getCurrentSession();
+  const session = await getEffectiveSession();
   if (!session) return null;
   let logs: AuditLogWithUser[] = [];
 

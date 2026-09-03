@@ -17,16 +17,20 @@ enum UserRole {
 }
 
 model Shop {
-  id          String   @id @default(cuid())
-  shopCode    String   @unique
-  name        String
-  description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  shopCode      String   @unique
+  name          String
+  description   String?
+  isActive      Boolean  @default(true)
+  isDemo        Boolean  @default(false)
+  demoExpiresAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   members             ShopMember[]
   sessions            AuthSession[]
+  guestSessions       GuestSession[]
+  invitations         ShopInvitation[]
   locations           Location[]
   customers           Customer[]
   transactions        Transaction[]
@@ -37,6 +41,7 @@ model Shop {
   feedback            Feedback[]
 
   @@index([shopCode])
+  @@index([isDemo, demoExpiresAt])
 }
 
 model User {
@@ -53,6 +58,7 @@ model User {
   memberships         ShopMember[]
   sessions            AuthSession[]
   otpTokens           OtpToken[]
+  invitationsCreated  ShopInvitation[] @relation("InvitationCreator")
   locationsCreated    Location[]      @relation("LocationCreator")
   customersCreated    Customer[]      @relation("CustomerCreator")
   transactionsCreated Transaction[]   @relation("TransactionCreator")
@@ -387,4 +393,37 @@ model Feedback {
   @@index([shopId, createdAt])
   @@index([userId])
   @@index([status])
+}
+
+model ShopInvitation {
+  id          String   @id @default(cuid())
+  shopId      String
+  code        String   @unique
+  createdById String
+  role        UserRole @default(EMPLOYEE)
+  maxUses     Int      @default(1)
+  usedCount   Int      @default(0)
+  expiresAt   DateTime
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  shop      Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  createdBy User @relation("InvitationCreator", fields: [createdById], references: [id])
+
+  @@index([shopId])
+  @@index([code])
+  @@index([expiresAt])
+}
+
+model GuestSession {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  shopId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId])
+  @@index([expiresAt])
 }

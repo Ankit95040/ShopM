@@ -5,7 +5,9 @@ import {
   authenticateWithPassword,
   createSession,
   destroySession,
+  requireAuth,
 } from "@/server/auth";
+import { db } from "@/server/db";
 
 export interface LoginActionState {
   error?: string;
@@ -45,4 +47,43 @@ export async function loginAction(
 export async function logoutAction() {
   await destroySession();
   redirect("/login");
+}
+
+export interface AccountDetails {
+  shopName: string;
+  shopCode: string;
+  userName: string;
+  loginId: string;
+  role: string;
+  email: string | null;
+  phone: string | null;
+  isGuest: boolean;
+}
+
+export async function getAccountDetailsAction(): Promise<AccountDetails | null> {
+  const session = await requireAuth();
+  if (!session) return null;
+
+  const shop = await db.shop.findUnique({
+    where: { id: session.shopId },
+    select: { name: true, shopCode: true },
+  });
+  if (!shop) return null;
+
+  const user = await db.user.findUnique({
+    where: { id: session.userId },
+    select: { name: true, email: true, phone: true },
+  });
+  if (!user) return null;
+
+  return {
+    shopName: shop.name,
+    shopCode: shop.shopCode,
+    userName: user.name,
+    loginId: session.loginId,
+    role: session.role,
+    email: user.email,
+    phone: user.phone,
+    isGuest: session.isGuest ?? false,
+  };
 }
