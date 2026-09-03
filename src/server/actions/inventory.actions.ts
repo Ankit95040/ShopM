@@ -313,19 +313,20 @@ async function getInventoryActionImpl({
       ];
     }
 
-    const items = await db.inventoryItem.findMany({
-      where: whereClause,
-      include: {
-        category: true,
-        createdBy: { select: { name: true } },
-      },
-      orderBy: { name: "asc" },
-    });
-
-    const categories = await db.inventoryCategory.findMany({
-      where: { shopId: session.shopId },
-      orderBy: { name: "asc" },
-    });
+    const [items, categories] = await Promise.all([
+      db.inventoryItem.findMany({
+        where: whereClause,
+        include: {
+          category: true,
+          createdBy: { select: { name: true } },
+        },
+        orderBy: { name: "asc" },
+      }),
+      db.inventoryCategory.findMany({
+        where: { shopId: session.shopId },
+        orderBy: { name: "asc" },
+      }),
+    ]);
 
     const formatted = items
       .map((item) => {
@@ -399,3 +400,35 @@ async function getStockMovementsActionImpl(itemId?: string) {
   }
 }
 export const getStockMovementsAction = withPerformance("getStockMovementsAction", "action", getStockMovementsActionImpl);
+
+async function getAllMovementsActionImpl() {
+  try {
+    const session = await requireAuth();
+
+    const movements = await db.stockMovement.findMany({
+      where: { shopId: session.shopId },
+      include: {
+        item: { select: { name: true, unit: true } },
+        createdBy: { select: { name: true } },
+      },
+      orderBy: { movementDate: "desc" },
+    });
+
+    return {
+      success: true,
+      movements: movements.map((m) => ({
+        id: m.id,
+        type: m.type,
+        quantity: Number(m.quantity),
+        removalReason: m.removalReason,
+        movementDate: m.movementDate,
+        itemName: m.item?.name || "Item",
+        itemUnit: m.item?.unit || "Unit",
+        createdByName: m.createdBy?.name || "User",
+      })),
+    };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch movements" };
+  }
+}
+export const getAllMovementsAction = withPerformance("getAllMovementsAction", "action", getAllMovementsActionImpl);

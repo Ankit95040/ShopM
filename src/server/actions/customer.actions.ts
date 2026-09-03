@@ -139,61 +139,60 @@ export const createCustomerAction = withPerformance("createCustomerAction", "act
 async function getCustomersByLocationActionImpl(locationId: string, search?: string) {
   try {
     const session = await requireAuth();
-    const whereClause: Prisma.CustomerWhereInput = {
-      shopId: session.shopId,
-      locationId,
-      isDeleted: false,
-    };
+    const searchPattern = search?.trim() ? `%${search.trim()}%` : null;
 
-    if (search?.trim()) {
-      whereClause.OR = [
-        { name: { contains: search.trim(), mode: "insensitive" } },
-        { phone: { contains: search.trim() } },
-      ];
-    }
+    // Single SQL query: customer + aggregated transaction totals + createdBy name
+    // Replaces Prisma nested include of ALL transactions per customer
+    const rows = await db.$queryRaw<
+      {
+        id: string;
+        name: string;
+        phone: string;
+        address: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        createdByName: string;
+        totalDebt: unknown;
+        totalReceived: unknown;
+        transactionCount: bigint;
+        lastTransactionDate: Date | null;
+      }[]
+    >`
+      SELECT c.id, c.name, c.phone, c.address, c."createdAt", c."updatedAt",
+             u.name AS "createdByName",
+             COALESCE(SUM(CASE WHEN t."type" = 'DEBT' THEN t.amount ELSE 0 END), 0) AS "totalDebt",
+             COALESCE(SUM(CASE WHEN t."type" = 'PAYMENT_RECEIVED' THEN t.amount ELSE 0 END), 0) AS "totalReceived",
+             COUNT(t.id)::bigint AS "transactionCount",
+             MAX(t."transactionDate") AS "lastTransactionDate"
+      FROM "Customer" c
+      JOIN "User" u ON c."createdById" = u.id
+      LEFT JOIN "Transaction" t ON t."customerId" = c.id AND t."isDeleted" = false
+      WHERE c."shopId" = ${session.shopId} AND c."locationId" = ${locationId} AND c."isDeleted" = false
+      ${searchPattern ? Prisma.sql`AND (c.name ILIKE ${searchPattern} OR c.phone LIKE ${searchPattern})` : Prisma.empty}
+      GROUP BY c.id, c.name, c.phone, c.address, c."createdAt", c."updatedAt", u.name
+      ORDER BY c.name ASC
+    `;
 
-    const customers = await db.customer.findMany({
-      where: whereClause,
-      include: {
-        transactions: {
-          where: { isDeleted: false },
-          select: { type: true, amount: true, transactionDate: true },
-          orderBy: { transactionDate: "desc" },
-        },
-        createdBy: { select: { name: true } },
-      },
-      orderBy: { name: "asc" },
-    });
-
-    const formatted = customers.map((c) => {
-      let totalDebt = 0;
-      let totalReceived = 0;
-
-      for (const t of c.transactions) {
-        const amt = Number(t.amount);
-        if (t.type === "DEBT") totalDebt += amt;
-        else if (t.type === "PAYMENT_RECEIVED") totalReceived += amt;
-      }
-
-      const balance = totalDebt - totalReceived;
-
+    const customers = rows.map((r) => {
+      const totalDebt = Number(r.totalDebt);
+      const totalReceived = Number(r.totalReceived);
       return {
-        id: c.id,
-        name: c.name,
-        phone: c.phone,
-        address: c.address,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
-        createdByName: c.createdBy.name,
+        id: r.id,
+        name: r.name,
+        phone: r.phone,
+        address: r.address,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        createdByName: r.createdByName,
         totalDebt,
         totalReceived,
-        outstandingBalance: balance,
-        transactionCount: c.transactions.length,
-        lastTransactionDate: c.transactions[0]?.transactionDate || null,
+        outstandingBalance: totalDebt - totalReceived,
+        transactionCount: Number(r.transactionCount),
+        lastTransactionDate: r.lastTransactionDate,
       };
     });
 
-    return { success: true, customers: formatted };
+    return { success: true, customers };
   } catch (error: unknown) {
     return { success: false, error: error instanceof Error ? error.message : "Failed to fetch customers" };
   }

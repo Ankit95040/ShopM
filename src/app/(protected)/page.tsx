@@ -31,73 +31,70 @@ async function DashboardContent({ session }: { session: { shopId: string; userNa
   let lowStockCount = 0;
   let outOfStockCount = 0;
   let recentTransactions: DashboardMetrics["recentTransactions"] = [];
-  let allTransactions: DashboardMetrics["allTransactions"] = [];
   let recentMovements: DashboardMetrics["recentMovements"] = [];
-  let allMovements: DashboardMetrics["allMovements"] = [];
+  let totalTransactionCount = 0;
+  let totalMovementCount = 0;
   let isDbConnected = true;
 
   try {
-    const activeCustomerIds = await db.customer.findMany({
-      where: { shopId: session.shopId, isDeleted: false },
-      select: { id: true },
-    });
-    const activeIds = activeCustomerIds.map((c) => c.id);
+    // Run all independent queries in parallel — no unbounded fetches
+    const [
+      tx10,
+      mv10,
+      inventoryStats,
+      txCount,
+      mvCount,
+    ] = await Promise.all([
+      // Recent 10 transactions (only what's shown on dashboard)
+      db.transaction.findMany({
+        where: {
+          shopId: session.shopId,
+          isDeleted: false,
+          customer: { isDeleted: false },
+        },
+        include: {
+          customer: { select: { name: true, phone: true } },
+          createdBy: { select: { name: true } },
+        },
+        orderBy: [{ transactionDate: "desc" }, { id: "desc" }],
+        take: 10,
+      }),
+      // Recent 10 movements (only what's shown on dashboard)
+      db.stockMovement.findMany({
+        where: { shopId: session.shopId },
+        include: {
+          item: { select: { name: true, unit: true } },
+          createdBy: { select: { name: true } },
+        },
+        orderBy: { movementDate: "desc" },
+        take: 10,
+      }),
+      // Inventory stats via SQL aggregate — no row transfer
+      db.$queryRaw<
+        { totalItems: bigint; lowStockCount: bigint; outOfStockCount: bigint }[]
+      >`
+        SELECT
+          COUNT(*) AS "totalItems",
+          COUNT(*) FILTER (WHERE "currentStock" > 0 AND "currentStock" <= "minStockThreshold") AS "lowStockCount",
+          COUNT(*) FILTER (WHERE "currentStock" <= 0) AS "outOfStockCount"
+        FROM "InventoryItem"
+        WHERE "shopId" = ${session.shopId} AND "isDeleted" = false
+      `,
+      // Total transaction count for "View All" button visibility
+      db.transaction.count({
+        where: {
+          shopId: session.shopId,
+          isDeleted: false,
+          customer: { isDeleted: false },
+        },
+      }),
+      // Total movement count for "View All" button visibility
+      db.stockMovement.count({
+        where: { shopId: session.shopId },
+      }),
+    ]);
 
-    const [tx10, txAll, locations, items, mv10, mvAll] =
-      await Promise.all([
-        activeIds.length > 0
-          ? db.transaction.findMany({
-              where: {
-                shopId: session.shopId,
-                isDeleted: false,
-                customerId: { in: activeIds },
-              },
-              include: {
-                customer: { select: { name: true, phone: true } },
-                createdBy: { select: { name: true } },
-              },
-              orderBy: [{ transactionDate: "desc" }, { id: "desc" }],
-              take: 10,
-            })
-          : Promise.resolve([]),
-        activeIds.length > 0
-          ? db.transaction.findMany({
-              where: {
-                shopId: session.shopId,
-                isDeleted: false,
-                customerId: { in: activeIds },
-              },
-              include: {
-                customer: { select: { name: true, phone: true } },
-                createdBy: { select: { name: true } },
-              },
-              orderBy: [{ transactionDate: "desc" }, { id: "desc" }],
-            })
-          : Promise.resolve([]),
-        db.location.findMany({ where: { shopId: session.shopId, isDeleted: false } }),
-        db.inventoryItem.findMany({ where: { shopId: session.shopId, isDeleted: false } }),
-        db.stockMovement.findMany({
-          where: { shopId: session.shopId },
-          include: {
-            item: { select: { name: true, unit: true } },
-            createdBy: { select: { name: true } },
-          },
-          orderBy: { movementDate: "desc" },
-          take: 10,
-        }),
-        db.stockMovement.findMany({
-          where: { shopId: session.shopId },
-          include: {
-            item: { select: { name: true, unit: true } },
-            createdBy: { select: { name: true } },
-          },
-          orderBy: { movementDate: "desc" },
-        }),
-      ]);
-
-    void locations;
-
-    const mapTx = (t: typeof tx10[number]) => ({
+    recentTransactions = tx10.map((t) => ({
       id: t.id,
       type: t.type,
       amount: Number(t.amount),
@@ -107,12 +104,9 @@ async function DashboardContent({ session }: { session: { shopId: string; userNa
       customerId: t.customerId,
       createdByName: t.createdBy?.name || "User",
       billImageKey: t.billImageKey,
-    });
+    }));
 
-    recentTransactions = tx10.map(mapTx);
-    allTransactions = txAll.map(mapTx);
-
-    const mapMv = (m: typeof mv10[number]) => ({
+    recentMovements = mv10.map((m) => ({
       id: m.id,
       type: m.type,
       quantity: Number(m.quantity),
@@ -121,19 +115,14 @@ async function DashboardContent({ session }: { session: { shopId: string; userNa
       itemName: m.item?.name || "Item",
       itemUnit: m.item?.unit || "Unit",
       createdByName: m.createdBy?.name || "User",
-    });
+    }));
 
-    recentMovements = mv10.map(mapMv);
-    allMovements = mvAll.map(mapMv);
-
-    totalItems = items.length;
-
-    for (const item of items) {
-      const stock = Number(item.currentStock);
-      const thresh = Number(item.minStockThreshold);
-      if (stock <= 0) outOfStockCount++;
-      else if (stock <= thresh) lowStockCount++;
-    }
+    const stats = inventoryStats[0];
+    totalItems = Number(stats.totalItems);
+    lowStockCount = Number(stats.lowStockCount);
+    outOfStockCount = Number(stats.outOfStockCount);
+    totalTransactionCount = txCount;
+    totalMovementCount = mvCount;
   } catch (error) {
     isDbConnected = false;
     console.error("[DashboardPage] Database query error:", error);
@@ -149,9 +138,9 @@ async function DashboardContent({ session }: { session: { shopId: string; userNa
     outOfStockCount,
     isDbConnected,
     recentTransactions,
-    allTransactions,
     recentMovements,
-    allMovements,
+    totalTransactionCount,
+    totalMovementCount,
   };
 
   return <DashboardView data={dashboardData} />;

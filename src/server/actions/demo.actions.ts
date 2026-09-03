@@ -173,7 +173,6 @@ async function copyDemoDataToShopActionImpl() {
 export const copyDemoDataToShopAction = withPerformance("copyDemoDataToShopAction", "action", copyDemoDataToShopActionImpl);
 
 async function getDemoDataSummaryActionImpl() {
-  const { getCurrentSession } = await import("@/server/auth");
   const authSession = await getCurrentSession();
   if (!authSession) {
     return { success: false, hasDemoData: false };

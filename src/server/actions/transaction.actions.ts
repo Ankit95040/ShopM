@@ -525,3 +525,40 @@ async function restoreTransactionActionImpl(transactionId: string) {
   }
 }
 export const restoreTransactionAction = withPerformance("restoreTransactionAction", "action", restoreTransactionActionImpl);
+
+async function getAllTransactionsActionImpl() {
+  try {
+    const session = await requireAuth();
+
+    const transactions = await db.transaction.findMany({
+      where: {
+        shopId: session.shopId,
+        isDeleted: false,
+        customer: { isDeleted: false },
+      },
+      include: {
+        customer: { select: { name: true, phone: true } },
+        createdBy: { select: { name: true } },
+      },
+      orderBy: [{ transactionDate: "desc" }, { id: "desc" }],
+    });
+
+    return {
+      success: true,
+      transactions: transactions.map((t) => ({
+        id: t.id,
+        type: t.type,
+        amount: Number(t.amount),
+        paymentMethod: t.paymentMethod,
+        transactionDate: t.transactionDate,
+        customerName: t.customer?.name || "Customer",
+        customerId: t.customerId,
+        createdByName: t.createdBy?.name || "User",
+        billImageKey: t.billImageKey,
+      })),
+    };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch transactions" };
+  }
+}
+export const getAllTransactionsAction = withPerformance("getAllTransactionsAction", "action", getAllTransactionsActionImpl);

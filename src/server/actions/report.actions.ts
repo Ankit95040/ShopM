@@ -4,6 +4,7 @@ import { withPerformance } from "@/lib/performance";
 import { db } from "@/server/db";
 import { requireAuth } from "@/server/auth";
 import { calculatePeriodReport, getPeriodDates, PeriodReport } from "@/lib/accounting";
+import { Prisma } from "@prisma/client";
 
 export interface ReportCustomer {
   id: string;
@@ -52,32 +53,74 @@ async function getReportDataImpl(params?: {
   customerId?: string;
 }): Promise<ReportData> {
   const session = await requireAuth();
+  const periodDates = params?.month ? getPeriodDates(params.month) : null;
 
-  const activeCustomerIds = await db.customer.findMany({
-    where: { shopId: session.shopId, isDeleted: false },
-    select: { id: true },
-  });
-  const ids = activeCustomerIds.map((c) => c.id);
-
-  // Fetch all non-deleted transactions for this shop
-  const allTransactions = ids.length > 0
-    ? await db.transaction.findMany({
-        where: {
-          shopId: session.shopId,
-          isDeleted: false,
-          customerId: { in: ids },
-        },
-        include: {
-          customer: { select: { name: true, phone: true, locationId: true } },
-          createdBy: { select: { name: true } },
-        },
-        orderBy: [{ transactionDate: "desc" }, { id: "desc" }],
-      })
-    : [];
+  // Run all independent queries in parallel:
+  // 1. Transactions with customer + location + createdBy via single JOIN query
+  // 2. Inventory period report (SQL aggregate)
+  // 3. Customer summary (SQL aggregate)
+  const [txRows, inventoryReport, customerRows] = await Promise.all([
+    // Q1: All transactions with joined customer, location, and createdBy data
+    db.$queryRaw<
+      {
+        id: string;
+        type: string;
+        amount: unknown;
+        transactionDate: Date;
+        customerId: string;
+        customerName: string;
+        customerPhone: string;
+        locationId: string;
+        locationName: string;
+        createdByName: string;
+        billNumber: string | null;
+        paymentMethod: string | null;
+        description: string | null;
+        billImageKey: string | null;
+      }[]
+    >`
+      SELECT t.id, t."type"::text, t.amount, t."transactionDate",
+             t."customerId",
+             c.name AS "customerName", c.phone AS "customerPhone",
+             c."locationId", l.name AS "locationName",
+             u.name AS "createdByName",
+             t."billNumber", t."paymentMethod"::text, t.description, t."billImageKey"
+      FROM "Transaction" t
+      JOIN "Customer" c ON t."customerId" = c.id AND c."isDeleted" = false
+      JOIN "Location" l ON c."locationId" = l.id
+      JOIN "User" u ON t."createdById" = u.id
+      WHERE t."shopId" = ${session.shopId} AND t."isDeleted" = false
+      ${params?.customerId ? Prisma.sql`AND t."customerId" = ${params.customerId}` : Prisma.empty}
+      ORDER BY t."transactionDate" DESC, t.id DESC
+    `,
+    // Q2: Inventory period report via SQL conditional aggregation
+    calculateInventoryPeriodReportSQL(session.shopId, periodDates?.start ?? null, periodDates?.end ?? null),
+    // Q3: Customer summary via SQL aggregation
+    db.$queryRaw<
+      {
+        id: string;
+        name: string;
+        phone: string;
+        locationName: string;
+        totalDebt: unknown;
+        totalReceived: unknown;
+      }[]
+    >`
+      SELECT c.id, c.name, c.phone,
+             l.name AS "locationName",
+             COALESCE(SUM(CASE WHEN t."type" = 'DEBT' THEN t.amount ELSE 0 END), 0) AS "totalDebt",
+             COALESCE(SUM(CASE WHEN t."type" = 'PAYMENT_RECEIVED' THEN t.amount ELSE 0 END), 0) AS "totalReceived"
+      FROM "Customer" c
+      JOIN "Location" l ON c."locationId" = l.id
+      LEFT JOIN "Transaction" t ON t."customerId" = c.id AND t."isDeleted" = false
+      WHERE c."shopId" = ${session.shopId} AND c."isDeleted" = false
+      GROUP BY c.id, c.name, c.phone, l.name
+    `,
+  ]);
 
   // Build available months from transactions
   const monthMap = new Map<string, string>();
-  for (const tx of allTransactions) {
+  for (const tx of txRows) {
     const d = new Date(tx.transactionDate);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const label = d.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
@@ -87,17 +130,8 @@ async function getReportDataImpl(params?: {
     .sort((a, b) => b[0].localeCompare(a[0]))
     .map(([key, label]) => ({ key, label }));
 
-  // Apply customer filter
-  let filteredTransactions = allTransactions;
-  if (params?.customerId) {
-    filteredTransactions = allTransactions.filter(
-      (tx) => tx.customerId === params.customerId
-    );
-  }
-
-  // Apply period filter and calculate period report
-  const periodDates = params?.month ? getPeriodDates(params.month) : null;
-  const txRecords = filteredTransactions.map((tx) => ({
+  // Calculate period report using the accounting module (preserves exact logic)
+  const txRecords = txRows.map((tx) => ({
     type: tx.type as "DEBT" | "PAYMENT_RECEIVED",
     amount: Number(tx.amount),
     transactionDate: tx.transactionDate,
@@ -109,67 +143,33 @@ async function getReportDataImpl(params?: {
     periodDates?.end ?? null
   );
 
-  // Calculate inventory period report
-  const inventoryReport = await calculateInventoryPeriodReport(
-    session.shopId,
-    periodDates?.start ?? null,
-    periodDates?.end ?? null
-  );
+  // Format customer summary
+  const customers: ReportCustomer[] = customerRows
+    .map((c) => {
+      const totalDebt = Number(c.totalDebt);
+      const totalReceived = Number(c.totalReceived);
+      return {
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        locationName: c.locationName,
+        totalDebt,
+        totalReceived,
+        outstandingBalance: totalDebt - totalReceived,
+      };
+    })
+    .sort((a, b) => b.outstandingBalance - a.outstandingBalance);
 
-  // Build customer summary (aggregated from all transactions, not period-filtered)
-  const customerMap = new Map<string, ReportCustomer>();
-  for (const tx of allTransactions) {
-    const cid = tx.customerId;
-    if (!customerMap.has(cid)) {
-      customerMap.set(cid, {
-        id: cid,
-        name: tx.customer?.name || "Customer",
-        phone: tx.customer?.phone || "",
-        locationName: "",
-        totalDebt: 0,
-        totalReceived: 0,
-        outstandingBalance: 0,
-      });
-    }
-    const cust = customerMap.get(cid)!;
-    const amt = Number(tx.amount);
-    if (tx.type === "DEBT") cust.totalDebt += amt;
-    else cust.totalReceived += amt;
-  }
-
-  // Fetch location names for customers
-  const locationIds = new Set<string>();
-  for (const cust of customerMap.values()) {
-    const tx = allTransactions.find((t) => t.customerId === cust.id);
-    if (tx?.customer?.locationId) {
-      locationIds.add(tx.customer.locationId);
-    }
-  }
-
-  const locations = await db.location.findMany({
-    where: { id: { in: Array.from(locationIds) } },
-    select: { id: true, name: true },
-  });
-  const locationMap = new Map(locations.map((l) => [l.id, l.name]));
-
-  for (const cust of customerMap.values()) {
-    const tx = allTransactions.find((t) => t.customerId === cust.id);
-    if (tx?.customer?.locationId) {
-      cust.locationName = locationMap.get(tx.customer.locationId) || "";
-    }
-    cust.outstandingBalance = cust.totalDebt - cust.totalReceived;
-  }
-
-  // Format transactions for report (include billImageKey for bill icon)
-  const transactions: ReportTransaction[] = filteredTransactions.map((tx) => ({
+  // Format transactions for report
+  const transactions: ReportTransaction[] = txRows.map((tx) => ({
     id: tx.id,
     type: tx.type as "DEBT" | "PAYMENT_RECEIVED",
     amount: Number(tx.amount),
     transactionDate: tx.transactionDate,
-    customerName: tx.customer?.name || "Customer",
+    customerName: tx.customerName || "Customer",
     customerId: tx.customerId,
-    locationName: locationMap.get(tx.customer?.locationId || "") || "",
-    createdByName: tx.createdBy?.name || "User",
+    locationName: tx.locationName || "",
+    createdByName: tx.createdByName || "User",
     billNumber: tx.billNumber,
     paymentMethod: tx.paymentMethod,
     description: tx.description,
@@ -180,65 +180,68 @@ async function getReportDataImpl(params?: {
   return {
     periodReport,
     inventoryReport,
-    customers: Array.from(customerMap.values()).sort(
-      (a, b) => b.outstandingBalance - a.outstandingBalance
-    ),
+    customers,
     transactions,
     availableMonths,
   };
 }
 export const getReportData = withPerformance("getReportData", "action", getReportDataImpl);
 
-async function calculateInventoryPeriodReport(
+/**
+ * Inventory period report via SQL conditional aggregation.
+ * Replaces the old approach of loading ALL stock movements into Node.js.
+ */
+async function calculateInventoryPeriodReportSQL(
   shopId: string,
   periodStart: Date | null,
   periodEnd: Date | null
 ): Promise<InventoryPeriodReport> {
-  // Get all stock movements for this shop
-  const allMovements = await db.stockMovement.findMany({
-    where: { shopId },
-    select: {
-      type: true,
-      quantity: true,
-      movementDate: true,
-    },
-    orderBy: { movementDate: "asc" },
-  });
+  // Run both queries in parallel
+  const [movementAgg, totalItems] = await Promise.all([
+    periodStart
+      ? db.$queryRaw<
+          { openingStock: unknown; stockIn: unknown; stockOut: unknown }[]
+        >`
+          SELECT
+            COALESCE(SUM(CASE
+              WHEN "movementDate" < ${periodStart} THEN
+                CASE WHEN "type" = 'ADD_STOCK' THEN "quantity" ELSE -"quantity" END
+              ELSE 0
+            END), 0) AS "openingStock",
+            COALESCE(SUM(CASE
+              WHEN "movementDate" >= ${periodStart} AND "movementDate" <= ${periodEnd ?? new Date('9999-12-31')} AND "type" = 'ADD_STOCK' THEN "quantity"
+              ELSE 0
+            END), 0) AS "stockIn",
+            COALESCE(SUM(CASE
+              WHEN "movementDate" >= ${periodStart} AND "movementDate" <= ${periodEnd ?? new Date('9999-12-31')} AND "type" = 'REMOVE_STOCK' THEN "quantity"
+              ELSE 0
+            END), 0) AS "stockOut"
+          FROM "StockMovement"
+          WHERE "shopId" = ${shopId}
+        `
+      : db.$queryRaw<
+          { openingStock: unknown; stockIn: unknown; stockOut: unknown }[]
+        >`
+          SELECT
+            0 AS "openingStock",
+            COALESCE(SUM(CASE WHEN "type" = 'ADD_STOCK' THEN "quantity" ELSE 0 END), 0) AS "stockIn",
+            COALESCE(SUM(CASE WHEN "type" = 'REMOVE_STOCK' THEN "quantity" ELSE 0 END), 0) AS "stockOut"
+          FROM "StockMovement"
+          WHERE "shopId" = ${shopId}
+        `,
+    db.inventoryItem.count({ where: { shopId, isDeleted: false } }),
+  ]);
 
-  const totalItems = await db.inventoryItem.count({
-    where: { shopId, isDeleted: false },
-  });
-
-  let openingStock = 0;
-  let stockIn = 0;
-  let stockOut = 0;
-
-  const startMs = periodStart ? periodStart.getTime() : 0;
-  const endMs = periodEnd ? periodEnd.getTime() : Infinity;
-
-  for (const m of allMovements) {
-    const mDate = new Date(m.movementDate).getTime();
-    const qty = Number(m.quantity);
-
-    // Count all movements for opening stock calculation
-    if (!periodStart || mDate < startMs) {
-      // Before period: count for opening stock
-      if (m.type === "ADD_STOCK") openingStock += qty;
-      else openingStock -= qty;
-    } else if (mDate <= endMs) {
-      // Within period
-      if (m.type === "ADD_STOCK") stockIn += qty;
-      else stockOut += qty;
-    }
-  }
-
-  const closingStock = openingStock + stockIn - stockOut;
+  const agg = movementAgg[0];
+  const openingStock = Number(agg.openingStock);
+  const stockIn = Number(agg.stockIn);
+  const stockOut = Number(agg.stockOut);
 
   return {
     openingStock,
     stockIn,
     stockOut,
-    closingStock,
+    closingStock: openingStock + stockIn - stockOut,
     totalItems,
   };
 }

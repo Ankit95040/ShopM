@@ -8,12 +8,38 @@ import {
   ArrowRight,
   X,
   FileText,
+  Loader2,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { useTranslation } from "@/lib/i18n";
 import { getBillImageSignedUrl } from "@/server/actions/upload.actions";
+import { getAllTransactionsAction } from "@/server/actions/transaction.actions";
+import { getAllMovementsAction } from "@/server/actions/inventory.actions";
 import { ImageViewer } from "@/components/shared/ImageViewer";
 import { useToast } from "@/components/shared/ToastContext";
+
+interface TransactionItem {
+  id: string;
+  type: string;
+  amount: number;
+  paymentMethod?: string | null;
+  transactionDate: string | Date;
+  customerName: string;
+  customerId: string;
+  createdByName: string;
+  billImageKey?: string | null;
+}
+
+interface MovementItem {
+  id: string;
+  type: string;
+  quantity: number;
+  removalReason?: string | null;
+  movementDate: string | Date;
+  itemName: string;
+  itemUnit: string;
+  createdByName: string;
+}
 
 export interface DashboardMetrics {
   userGreetingName?: string;
@@ -21,48 +47,10 @@ export interface DashboardMetrics {
   lowStockCount: number;
   outOfStockCount: number;
   isDbConnected: boolean;
-  recentTransactions: Array<{
-    id: string;
-    type: string;
-    amount: number;
-    paymentMethod?: string | null;
-    transactionDate: string | Date;
-    customerName: string;
-    customerId: string;
-    createdByName: string;
-    billImageKey?: string | null;
-  }>;
-  allTransactions: Array<{
-    id: string;
-    type: string;
-    amount: number;
-    paymentMethod?: string | null;
-    transactionDate: string | Date;
-    customerName: string;
-    customerId: string;
-    createdByName: string;
-    billImageKey?: string | null;
-  }>;
-  recentMovements: Array<{
-    id: string;
-    type: string;
-    quantity: number;
-    removalReason?: string | null;
-    movementDate: string | Date;
-    itemName: string;
-    itemUnit: string;
-    createdByName: string;
-  }>;
-  allMovements: Array<{
-    id: string;
-    type: string;
-    quantity: number;
-    removalReason?: string | null;
-    movementDate: string | Date;
-    itemName: string;
-    itemUnit: string;
-    createdByName: string;
-  }>;
+  recentTransactions: TransactionItem[];
+  recentMovements: MovementItem[];
+  totalTransactionCount: number;
+  totalMovementCount: number;
 }
 
 export function DashboardView({ data }: { data: DashboardMetrics }) {
@@ -74,13 +62,19 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
   const [showTransactionsModal, setShowTransactionsModal] = useState(false);
   const [showMovementsModal, setShowMovementsModal] = useState(false);
 
+  // Lazy-loaded data for View All modals
+  const [allTransactions, setAllTransactions] = useState<TransactionItem[] | null>(null);
+  const [allMovements, setAllMovements] = useState<MovementItem[] | null>(null);
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
+  const [loadingMovements, setLoadingMovements] = useState(false);
+
   const {
     userGreetingName,
     isDbConnected,
     recentTransactions,
-    allTransactions,
     recentMovements,
-    allMovements,
+    totalTransactionCount,
+    totalMovementCount,
   } = data;
 
   const greetingText = userGreetingName
@@ -98,6 +92,40 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
       toast.error(res.error || "Failed to load bill image");
     }
   };
+
+  // Lazy-load all transactions when View All is clicked
+  const handleShowAllTransactions = useCallback(async () => {
+    setShowTransactionsModal(true);
+    if (allTransactions !== null) return; // already loaded
+    setLoadingTransactions(true);
+    try {
+      const res = await getAllTransactionsAction();
+      if (res.success && res.transactions) {
+        setAllTransactions(res.transactions);
+      }
+    } catch {
+      toast.error("Failed to load transactions");
+    } finally {
+      setLoadingTransactions(false);
+    }
+  }, [allTransactions, toast]);
+
+  // Lazy-load all movements when View All is clicked
+  const handleShowAllMovements = useCallback(async () => {
+    setShowMovementsModal(true);
+    if (allMovements !== null) return; // already loaded
+    setLoadingMovements(true);
+    try {
+      const res = await getAllMovementsAction();
+      if (res.success && res.movements) {
+        setAllMovements(res.movements);
+      }
+    } catch {
+      toast.error("Failed to load movements");
+    } finally {
+      setLoadingMovements(false);
+    }
+  }, [allMovements, toast]);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -124,8 +152,8 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
     }
   }, [showTransactionsModal, showMovementsModal, handleKeyDown]);
 
-  const hasMoreTransactions = allTransactions.length > recentTransactions.length;
-  const hasMoreMovements = allMovements.length > recentMovements.length;
+  const hasMoreTransactions = totalTransactionCount > recentTransactions.length;
+  const hasMoreMovements = totalMovementCount > recentMovements.length;
 
   return (
     <div className="p-4 sm:p-8 space-y-8 max-w-7xl mx-auto">
@@ -254,7 +282,7 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-[10px] text-slate-400">
-                        {formatDate(tx.transactionDate, "dd MMM, hh:mm a")} \u{2022} {t("addedBy")}: {tx.createdByName}
+                        {formatDate(tx.transactionDate, "dd MMM, hh:mm a")} &bull; {t("addedBy")}: {tx.createdByName}
                       </span>
                       {tx.billImageKey && (
                         <button
@@ -285,7 +313,7 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
           {/* View All Button */}
           {hasMoreTransactions && (
             <button
-              onClick={() => setShowTransactionsModal(true)}
+              onClick={handleShowAllTransactions}
               className="flex items-center justify-center gap-1.5 w-full pt-2 text-xs font-bold text-sky-600 hover:text-sky-700 transition min-h-[44px]"
             >
               <span>{t("viewAll")}</span>
@@ -315,7 +343,7 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
                       {m.itemName} ({m.type === "ADD_STOCK" ? t("stockInflow") : t("stockOutflow")})
                     </div>
                     <span className="text-[10px] text-slate-400">
-                      {formatDate(m.movementDate, "dd MMM, hh:mm a")} \u{2022} {t("addedBy")}: {m.createdByName}
+                      {formatDate(m.movementDate, "dd MMM, hh:mm a")} &bull; {t("addedBy")}: {m.createdByName}
                     </span>
                   </div>
                   <span
@@ -335,7 +363,7 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
           {/* View All Button */}
           {hasMoreMovements && (
             <button
-              onClick={() => setShowMovementsModal(true)}
+              onClick={handleShowAllMovements}
               className="flex items-center justify-center gap-1.5 w-full pt-2 text-xs font-bold text-emerald-600 hover:text-emerald-700 transition min-h-[44px]"
             >
               <span>{t("viewAll")}</span>
@@ -353,7 +381,9 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
               <div>
                 <h3 className="text-sm font-black text-slate-900">{t("recentTransactions")}</h3>
-                <p className="text-[11px] text-slate-400">{allTransactions.length} {t("viewAllShowing")}</p>
+                <p className="text-[11px] text-slate-400">
+                  {loadingTransactions ? "Loading..." : `${allTransactions?.length ?? 0} ${t("viewAllShowing")}`}
+                </p>
               </div>
               <button
                 onClick={() => setShowTransactionsModal(false)}
@@ -366,37 +396,43 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
 
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto px-5 py-3 divide-y divide-slate-100 text-xs overscroll-contain">
-              {allTransactions.map((tx) => (
-                <div key={tx.id} className="py-3 flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-bold text-slate-900 truncate">
-                      {tx.customerName} ({tx.type === "DEBT" ? t("billLabel") : tx.paymentMethod || t("paymentLabel")})
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] text-slate-400">
-                        {formatDate(tx.transactionDate, "dd MMM, hh:mm a")} \u{2022} {t("addedBy")}: {tx.createdByName}
-                      </span>
-                      {tx.billImageKey && (
-                        <button
-                          onClick={() => handleViewBillImage(tx)}
-                          className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] h-11 w-11 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition shrink-0"
-                          title={t("viewBillImage")}
-                          aria-label={t("viewBillImage")}
-                        >
-                          <FileText className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <span
-                    className={`font-black shrink-0 ml-2 ${
-                      tx.type === "DEBT" ? "text-red-600" : "text-emerald-600"
-                    }`}
-                  >
-                    {tx.type === "DEBT" ? "+" : "-"}{formatCurrency(tx.amount)}
-                  </span>
+              {loadingTransactions ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
                 </div>
-              ))}
+              ) : (
+                (allTransactions ?? []).map((tx) => (
+                  <div key={tx.id} className="py-3 flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-slate-900 truncate">
+                        {tx.customerName} ({tx.type === "DEBT" ? t("billLabel") : tx.paymentMethod || t("paymentLabel")})
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] text-slate-400">
+                          {formatDate(tx.transactionDate, "dd MMM, hh:mm a")} &bull; {t("addedBy")}: {tx.createdByName}
+                        </span>
+                        {tx.billImageKey && (
+                          <button
+                            onClick={() => handleViewBillImage(tx)}
+                            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] h-11 w-11 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition shrink-0"
+                            title={t("viewBillImage")}
+                            aria-label={t("viewBillImage")}
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <span
+                      className={`font-black shrink-0 ml-2 ${
+                        tx.type === "DEBT" ? "text-red-600" : "text-emerald-600"
+                      }`}
+                    >
+                      {tx.type === "DEBT" ? "+" : "-"}{formatCurrency(tx.amount)}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
 
             {/* Modal Footer */}
@@ -420,7 +456,9 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
               <div>
                 <h3 className="text-sm font-black text-slate-900">{t("inventoryStockSummary")}</h3>
-                <p className="text-[11px] text-slate-400">{allMovements.length} {t("viewAllShowing")}</p>
+                <p className="text-[11px] text-slate-400">
+                  {loadingMovements ? "Loading..." : `${allMovements?.length ?? 0} ${t("viewAllShowing")}`}
+                </p>
               </div>
               <button
                 onClick={() => setShowMovementsModal(false)}
@@ -433,25 +471,31 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
 
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto px-5 py-3 divide-y divide-slate-100 text-xs overscroll-contain">
-              {allMovements.map((m) => (
-                <div key={m.id} className="py-3 flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-bold text-slate-900 truncate">
-                      {m.itemName} ({m.type === "ADD_STOCK" ? t("stockInflow") : t("stockOutflow")})
+              {loadingMovements ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+                </div>
+              ) : (
+                (allMovements ?? []).map((m) => (
+                  <div key={m.id} className="py-3 flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-slate-900 truncate">
+                        {m.itemName} ({m.type === "ADD_STOCK" ? t("stockInflow") : t("stockOutflow")})
+                      </div>
+                      <span className="text-[10px] text-slate-400">
+                        {formatDate(m.movementDate, "dd MMM, hh:mm a")} &bull; {t("addedBy")}: {m.createdByName}
+                      </span>
                     </div>
-                    <span className="text-[10px] text-slate-400">
-                      {formatDate(m.movementDate, "dd MMM, hh:mm a")} \u{2022} {t("addedBy")}: {m.createdByName}
+                    <span
+                      className={`font-black shrink-0 ml-2 ${
+                        m.type === "ADD_STOCK" ? "text-emerald-600" : "text-red-600"
+                      }`}
+                    >
+                      {m.type === "ADD_STOCK" ? "+" : "-"}{m.quantity} {m.itemUnit}
                     </span>
                   </div>
-                  <span
-                    className={`font-black shrink-0 ml-2 ${
-                      m.type === "ADD_STOCK" ? "text-emerald-600" : "text-red-600"
-                    }`}
-                  >
-                    {m.type === "ADD_STOCK" ? "+" : "-"}{m.quantity} {m.itemUnit}
-                  </span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             {/* Modal Footer */}
