@@ -12,10 +12,12 @@ import {
   Mail,
   Phone,
   Shield,
+  Trash2,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { useToast } from "@/components/shared/ToastContext";
 import { getAccountDetailsAction, AccountDetails } from "@/server/actions/auth.actions";
+import { DeleteAccountModal } from "@/components/shared/DeleteAccountModal";
 
 interface AccountDetailsModalProps {
   isOpen: boolean;
@@ -61,6 +63,7 @@ export function AccountDetailsModal({ isOpen, onClose }: AccountDetailsModalProp
   const [details, setDetails] = useState<AccountDetails | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const fetchedRef = useRef(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen || fetchedRef.current) return;
@@ -150,7 +153,7 @@ export function AccountDetailsModal({ isOpen, onClose }: AccountDetailsModalProp
 
   if (!isOpen || typeof window === "undefined") return null;
 
-  return createPortal(
+  const mainPortal = createPortal(
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
       onMouseDown={(e) => {
@@ -267,6 +270,27 @@ export function AccountDetailsModal({ isOpen, onClose }: AccountDetailsModalProp
                   )}
                 </div>
               </div>
+
+              {/* Danger Zone — Delete Account */}
+              {!details.isGuest && (
+                <div className="rounded-2xl border-2 border-red-200 bg-red-50/70 p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Trash2 className="h-4 w-4 text-red-600" />
+                    <h4 className="text-xs font-black text-red-700 uppercase tracking-wider">Danger Zone</h4>
+                  </div>
+                  <p className="text-xs leading-relaxed text-red-700/80">
+                    Deleting your account will permanently remove your user login. Your shop and its data will remain for other members.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsDeleteOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-xl bg-white border-2 border-red-300 px-4 py-2.5 text-xs font-black text-red-600 hover:bg-red-50 hover:border-red-400 transition min-h-[44px]"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Account
+                  </button>
+                </div>
+              )}
             </>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -299,5 +323,12 @@ export function AccountDetailsModal({ isOpen, onClose }: AccountDetailsModalProp
       </div>
     </div>,
     document.body,
+  );
+
+  return (
+    <>
+      {mainPortal}
+      <DeleteAccountModal isOpen={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} />
+    </>
   );
 }

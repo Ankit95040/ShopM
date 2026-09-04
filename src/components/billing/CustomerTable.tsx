@@ -125,7 +125,7 @@ export function CustomerTable({
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 min-w-0 max-w-full">
       {/* Breadcrumb & Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -139,9 +139,9 @@ export function CustomerTable({
           <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
             {t("customersUnderLocation", { locationName })}
           </h1>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-slate-500 break-words">
             {t("totalOutstandingKhata")}:{" "}
-            <span className="font-extrabold text-red-600">
+            <span className="font-extrabold text-red-600 whitespace-nowrap">
               {formatCurrency(totalLocationBalance)}
             </span>
           </p>
@@ -175,8 +175,101 @@ export function CustomerTable({
           </div>
         </div>
 
-        {/* Customer Table */}
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+        {/* Mobile: Customer Cards (≤768px) — replaces table to avoid horizontal page scroll */}
+        <div className="md:hidden space-y-3">
+          {filtered.length > 0 ? (
+            filtered.map((c) => {
+              const isAdvance = c.outstandingBalance < 0;
+              const isSettled = c.outstandingBalance === 0;
+              return (
+                <div
+                  key={c.id}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs min-w-0 overflow-hidden"
+                >
+                  {/* Top: name + status */}
+                  <div className="flex items-start justify-between gap-2 min-w-0">
+                    <Link
+                      href={`/billing/${locationId}/customers/${c.id}`}
+                      className="min-w-0 flex-1 font-extrabold text-[15px] leading-tight text-slate-900 hover:text-sky-600 break-words"
+                    >
+                      {c.name}
+                    </Link>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold leading-none whitespace-nowrap ${
+                        isAdvance
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : isSettled
+                          ? "bg-slate-100 text-slate-700 border border-slate-200"
+                          : "bg-red-50 text-red-700 border border-red-200"
+                      }`}
+                    >
+                      {isAdvance ? t("advanceCredit") : isSettled ? "SETTLED" : t("dueBalance")}
+                    </span>
+                  </div>
+
+                  {/* Phone / Address */}
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 min-w-0">
+                    <span className="inline-flex items-center gap-1 min-w-0 font-mono break-all">
+                      <Phone className="h-3 w-3 shrink-0 text-slate-400" /> {c.phone}
+                    </span>
+                    {c.address && (
+                      <span className="inline-flex items-center gap-1 min-w-0 break-words">
+                        <MapPin className="h-3 w-3 shrink-0 text-slate-400" /> <span className="break-words">{c.address}</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Financial summary — stacked, no horizontal overflow */}
+                  <div className="mt-3 grid grid-cols-3 gap-1.5 rounded-xl bg-slate-50 border border-slate-100 p-2 min-w-0">
+                    <div className="min-w-0 text-center">
+                      <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 whitespace-nowrap">Debt</div>
+                      <div className="mt-0.5 text-[11px] min-[360px]:text-xs font-black text-slate-700 whitespace-nowrap">{formatCurrency(c.totalDebt)}</div>
+                    </div>
+                    <div className="min-w-0 text-center border-x border-slate-200 px-1">
+                      <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 whitespace-nowrap">Paid</div>
+                      <div className="mt-0.5 text-[11px] min-[360px]:text-xs font-black text-emerald-600 whitespace-nowrap">{formatCurrency(c.totalReceived)}</div>
+                    </div>
+                    <div className="min-w-0 text-center">
+                      <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 whitespace-nowrap">Balance</div>
+                      <div className={`mt-0.5 text-[11px] min-[360px]:text-xs font-black whitespace-nowrap ${isAdvance ? "text-emerald-700" : isSettled ? "text-slate-700" : "text-red-600"}`}>
+                        {isAdvance ? `${formatCurrency(Math.abs(c.outstandingBalance))}` : formatCurrency(c.outstandingBalance)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions — 44px touch targets, comfortable spacing */}
+                  <div className="mt-3 flex items-center gap-2 min-w-0">
+                    <Link
+                      href={`/billing/${locationId}/customers/${c.id}`}
+                      className="flex-1 inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white shadow-xs hover:bg-slate-800 transition min-w-0"
+                    >
+                      <span className="truncate">{t("openLedger")}</span>
+                      <ArrowRight className="h-4 w-4 shrink-0" />
+                    </Link>
+                    <button
+                      onClick={() => handleDeleteClick(c)}
+                      aria-label="Delete customer"
+                      className="shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100">
+                <Users className="h-6 w-6 text-slate-400" />
+              </div>
+              <p className="mt-3 text-sm font-semibold text-slate-600 break-words">{search ? `No customers match "${search}"` : "No customers yet"}</p>
+              <p className="mt-1 text-xs text-slate-400 break-words">{search ? "Try a different search term." : "Add your first customer to start managing khata balances."}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Desktop: Customer Table (≥768px) — unchanged */}
+        <div className="hidden md:block overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
@@ -216,15 +309,15 @@ export function CustomerTable({
                           </div>
                         </td>
 
-                        <td className="px-5 py-3.5 text-right font-bold text-slate-700">
+                        <td className="px-5 py-3.5 text-right font-bold text-slate-700 whitespace-nowrap">
                           {formatCurrency(c.totalDebt)}
                         </td>
 
-                        <td className="px-5 py-3.5 text-right font-bold text-emerald-600">
+                        <td className="px-5 py-3.5 text-right font-bold text-emerald-600 whitespace-nowrap">
                           {formatCurrency(c.totalReceived)}
                         </td>
 
-                        <td className="px-5 py-3.5 text-right font-black text-sm">
+                        <td className="px-5 py-3.5 text-right font-black text-sm whitespace-nowrap">
                           <span className={isAdvance ? "text-emerald-700" : isSettled ? "text-slate-700" : "text-red-600"}>
                             {isAdvance
                               ? `${formatCurrency(Math.abs(c.outstandingBalance))} (Adv)`
@@ -307,8 +400,8 @@ export function CustomerTable({
 
       {/* ADD CUSTOMER MODAL */}
       {isAddOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl sm:rounded-3xl bg-white p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-slate-900">{t("addNewCustomerModalTitle", { locationName })}</h3>
 
             <form onSubmit={handleCreateCustomer} className="mt-4 space-y-4">

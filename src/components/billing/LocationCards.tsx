@@ -120,51 +120,51 @@ export function LocationCards({
   const noResults = !isEmpty && filtered.length === 0;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 min-w-0">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl sm:text-3xl font-black tracking-tight text-slate-900 break-words">
             {t("billingLocationsTitle")}
           </h1>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-slate-500 break-words">
             {t("billingLocationsSubtitle")}
           </p>
         </div>
 
         <button
           onClick={() => setIsAddModalOpen(true)}
-          className="inline-flex items-center gap-2 self-start rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-slate-800 active:scale-[0.98]"
+          className="inline-flex items-center justify-center gap-2 self-stretch sm:self-start rounded-xl bg-slate-900 px-4 py-3 sm:py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-slate-800 active:scale-[0.98] min-h-[44px]"
         >
-          <Plus className="h-4 w-4 text-sky-400" />
+          <Plus className="h-4 w-4 shrink-0 text-sky-400" />
           <span>{t("addLocationBtn")}</span>
         </button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+      {/* Summary Cards — desktop only */}
+      <div className="hidden sm:grid grid-cols-3 gap-3 min-w-0">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs min-w-0 overflow-hidden">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{t("totalOutstanding")}</span>
-          <div className="mt-1 text-xl font-black text-red-600 sm:text-2xl">
+          <div className="mt-1 text-xl font-black text-red-600 sm:text-2xl whitespace-nowrap">
             {formatCurrency(totalAllBalance)}
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-400">Across all locations</p>
+          <p className="mt-0.5 text-[11px] text-slate-400 break-words">Across all locations</p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs min-w-0 overflow-hidden">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{t("paymentsReceived")}</span>
-          <div className="mt-1 text-xl font-black text-emerald-600 sm:text-2xl">
+          <div className="mt-1 text-xl font-black text-emerald-600 sm:text-2xl whitespace-nowrap">
             {formatCurrency(totalAllReceived)}
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-400">Collected from customers</p>
+          <p className="mt-0.5 text-[11px] text-slate-400 break-words">Collected from customers</p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs min-w-0 overflow-hidden">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{t("totalCustomers")}</span>
-          <div className="mt-1 text-xl font-black text-slate-900 sm:text-2xl">
+          <div className="mt-1 text-xl font-black text-slate-900 sm:text-2xl break-words">
             {t("registeredCustomers", { count: totalCustomerCount })}
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-400">
+          <p className="mt-0.5 text-[11px] text-slate-400 break-words">
             {locations.length} Location{locations.length !== 1 ? "s" : ""}
           </p>
         </div>
@@ -238,38 +238,52 @@ export function LocationCards({
                     <button
                       onClick={(e) => handleDeleteClick(e, loc)}
                       title="Delete Location"
-                      className="rounded-lg p-1.5 text-slate-300 transition hover:bg-red-50 hover:text-red-600"
+                      className="inline-flex h-11 w-11 sm:h-8 sm:w-8 items-center justify-center rounded-lg text-slate-300 transition hover:bg-red-50 hover:text-red-600 shrink-0"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
 
-                  <h3 className="mt-3 text-base font-black text-slate-900 transition group-hover:text-sky-600">
+                  <h3 className="mt-3 text-base font-black text-slate-900 transition group-hover:text-sky-600 break-words min-w-0">
                     {loc.name}
                   </h3>
                   {loc.description && (
-                    <p className="mt-1 line-clamp-2 text-xs text-slate-500">{loc.description}</p>
+                    <p className="mt-1 line-clamp-2 text-xs text-slate-500 break-words">{loc.description}</p>
                   )}
 
-                  <div className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700">
-                    <Users className="h-3.5 w-3.5 text-slate-400" />
-                    <span>{t("registeredCustomers", { count: loc.customerCount })}</span>
+                  {/* Mobile: small secondary customer count */}
+                  <div className="sm:hidden mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+                    <Users className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <span>{loc.customerCount} {loc.customerCount === 1 ? "registered customer" : "registered customers"}</span>
+                  </div>
+                  {/* Desktop: pill style */}
+                  <div className="hidden sm:inline-flex mt-3 items-center gap-1.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 max-w-full break-words">
+                    <Users className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <span className="break-words">{t("registeredCustomers", { count: loc.customerCount })}</span>
                   </div>
                 </div>
 
-                <div className="mt-4 border-t border-slate-100 pt-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">{t("balanceDue")}:</span>
-                    <span className="text-base font-black text-red-600">
+                {/* Desktop footer with balance — hidden on mobile */}
+                <div className="hidden sm:block mt-4 border-t border-slate-100 pt-3 min-w-0">
+                  <div className="flex items-center justify-between text-xs gap-2 min-w-0">
+                    <span className="text-slate-500 shrink-0">{t("balanceDue")}:</span>
+                    <span className="text-base font-black text-red-600 whitespace-nowrap text-right min-w-0">
                       {formatCurrency(loc.outstandingBalance)}
                     </span>
                   </div>
-                  <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
-                    <span>{t("addedBy")}: {loc.createdByName}</span>
-                    <span className="flex items-center gap-1 font-bold text-sky-600 transition group-hover:translate-x-0.5">
-                      {t("openCustomers")} <ArrowRight className="h-3 w-3" />
+                  <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-400 gap-2 min-w-0">
+                    <span className="truncate min-w-0">{t("addedBy")}: {loc.createdByName}</span>
+                    <span className="flex items-center gap-1 font-bold text-sky-600 transition group-hover:translate-x-0.5 shrink-0 whitespace-nowrap">
+                      {t("openCustomers")} <ArrowRight className="h-3 w-3 shrink-0" />
                     </span>
                   </div>
+                </div>
+                {/* Mobile footer — only Open action, compact */}
+                <div className="sm:hidden mt-3 flex items-center justify-between">
+                  <span className="text-xs text-slate-400 truncate">{t("addedBy")}: {loc.createdByName}</span>
+                  <span className="flex items-center gap-1 text-xs font-bold text-sky-600 shrink-0 whitespace-nowrap">
+                    Open Location <ArrowRight className="h-3 w-3 shrink-0" />
+                  </span>
                 </div>
               </Link>
             ))}
@@ -294,8 +308,8 @@ export function LocationCards({
 
       {/* ADD LOCATION MODAL */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl sm:rounded-3xl bg-white p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-slate-900">{t("createLocationTitle")}</h3>
             <p className="mt-0.5 text-xs text-slate-500">
               {t("createLocationSubtitle")}

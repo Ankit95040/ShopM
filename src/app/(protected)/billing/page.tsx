@@ -37,7 +37,7 @@ async function BillingContent() {
 
 export default function BillingPage() {
   return (
-    <div className="p-4 sm:p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-8 max-w-7xl mx-auto min-w-0">
       <Suspense fallback={<BillingSkeleton />}>
         <BillingContent />
       </Suspense>

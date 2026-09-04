@@ -15,6 +15,7 @@ import {
   FileText,
   Pencil,
   X,
+  ArrowRight,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import {
@@ -628,52 +629,52 @@ export function CustomerLedgerView({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 pb-24 sm:pb-0">
       {/* Breadcrumb & Navigation */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <Link
             href={`/billing/${customer.locationId}`}
-            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition shadow-xs"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition shadow-xs"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <div>
-            <div className="flex items-center gap-2 text-xs text-slate-500 font-semibold">
-              <span>{customer.locationName}</span>
-              <span>/</span>
-              <span>{t("khataLedger")}</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 text-xs text-slate-500 font-semibold break-words">
+              <span className="truncate">{customer.locationName}</span>
+              <span className="shrink-0">/</span>
+              <span className="shrink-0">{t("khataLedger")}</span>
             </div>
-            <h1 className="text-2xl font-black text-slate-900 sm:text-3xl flex items-center gap-2">
-              {customer.name}
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 sm:text-3xl flex items-center gap-2 break-words min-w-0">
+              <span className="break-words min-w-0">{customer.name}</span>
             </h1>
           </div>
         </div>
 
-        {/* Action Buttons: WhatsApp & Print */}
-        <div className="flex items-center gap-2">
+        {/* Action Buttons: WhatsApp & Print — desktop only, hidden on mobile */}
+        <div className="hidden sm:flex flex-row items-center gap-2 shrink-0">
           <button
             onClick={handleShareWhatsApp}
-            className="flex items-center gap-1.5 rounded-2xl bg-emerald-600 px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-emerald-700 transition"
+            className="flex items-center justify-center gap-1.5 rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-md hover:bg-emerald-700 transition min-h-[44px] min-w-0"
           >
-            <Share2 className="h-4 w-4" />
-            <span>{t("shareWhatsAppStatement")}</span>
+            <Share2 className="h-4 w-4 shrink-0" />
+            <span className="truncate">{t("shareWhatsAppStatement")}</span>
           </button>
 
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-1.5 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-xs sm:text-sm font-bold text-slate-700 shadow-xs hover:bg-slate-50 transition"
+            className="flex items-center justify-center gap-1.5 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-xs hover:bg-slate-50 transition min-h-[44px] min-w-0"
           >
-            <Printer className="h-4 w-4" />
-            <span>{t("printStatement")}</span>
+            <Printer className="h-4 w-4 shrink-0" />
+            <span className="truncate">{t("printStatement")}</span>
           </button>
         </div>
       </div>
 
-      {/* PERIOD SELECTOR */}
-      <div className="flex items-center gap-3">
-        <span className="text-xs font-bold text-slate-600">{t("viewPeriod")}:</span>
-        <div className="flex items-center gap-1.5 overflow-x-auto">
+      {/* PERIOD SELECTOR — contained pill scroller */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 min-w-0 overflow-hidden">
+        <span className="text-xs font-bold text-slate-600 shrink-0">{t("viewPeriod")}:</span>
+        <div className="flex items-center gap-1.5 overflow-x-auto min-w-0 w-full pb-1 -mb-1 scrollbar-thin sm:pb-0 sm:mb-0">
           <button
             onClick={() => setSelectedPeriod("all")}
             className={`whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-bold transition ${
@@ -701,21 +702,21 @@ export function CustomerLedgerView({
       </div>
 
       {/* CUSTOMER ACCOUNT SUMMARY CARD */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-6">
+      <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm min-w-0 overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-4">
           {/* Customer Meta */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-3 text-xs font-semibold text-slate-600">
-              <span className="flex items-center gap-1 font-mono">
-                <Phone className="h-3.5 w-3.5 text-slate-400" /> {customer.phone}
+          <div className="space-y-1 min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-slate-600 min-w-0">
+              <span className="flex items-center gap-1 font-mono min-w-0 break-all">
+                <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" /> <span className="break-all">{customer.phone}</span>
               </span>
               {customer.address && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5 text-slate-400" /> {customer.address}
+                <span className="flex items-center gap-1 min-w-0 break-words">
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" /> <span className="break-words">{customer.address}</span>
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-slate-400 break-words">
               {t("accountCreatedAt", {
                 user: customer.createdByName,
                 date: formatDate(customer.createdAt, "dd MMM yyyy"),
@@ -723,56 +724,85 @@ export function CustomerLedgerView({
             </p>
           </div>
 
-          {/* Quick Transaction Modals CTA */}
-          <div className="flex items-center gap-3">
+          {/* Quick Transaction Modals CTA — desktop only (mobile uses floating bar) */}
+          <div className="hidden sm:flex flex-row items-center gap-3 shrink-0">
             <button
               onClick={() => setIsAddDebtOpen(true)}
-              className="flex items-center gap-2 rounded-2xl bg-red-600 px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-red-700 transition active:scale-98"
+              className="flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:bg-red-700 transition active:scale-98 min-h-[44px] min-w-0"
             >
-              <Plus className="h-4 w-4" />
-              <span>{t("addDebtBillBtn")}</span>
+              <Plus className="h-4 w-4 shrink-0" />
+              <span className="truncate">{t("addDebtBillBtn")}</span>
             </button>
 
             <button
               onClick={() => setIsAddPaymentOpen(true)}
-              className="flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-emerald-700 transition active:scale-98"
+              className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:bg-emerald-700 transition active:scale-98 min-h-[44px] min-w-0"
             >
-              <ArrowDownLeft className="h-4 w-4" />
-              <span>{t("addPaymentBtn")}</span>
+              <ArrowDownLeft className="h-4 w-4 shrink-0" />
+              <span className="truncate">{t("addPaymentBtn")}</span>
             </button>
           </div>
         </div>
 
-        {/* 3 Metric Cards */}
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3 border-t border-slate-100 pt-5">
-          <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
+        {/* Mobile: Single compact Account Summary — 3 columns side-by-side */}
+        <div className="sm:hidden mt-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-xs min-w-0">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h3 className="text-sm font-black text-slate-900">Account Summary</h3>
+            <span className="text-[11px] font-medium text-slate-400 whitespace-nowrap">
+              {debtTransactions.length} bill{debtTransactions.length !== 1 ? "s" : ""} • {paymentTransactions.length} payment{paymentTransactions.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            <div className="rounded-xl bg-red-50 border border-red-100 p-2 text-center min-w-0">
+              <div className="text-[9px] font-bold uppercase tracking-wide text-red-700 leading-tight whitespace-nowrap">Total Debt</div>
+              <div className="mt-1 text-[12px] min-[360px]:text-xs min-[400px]:text-sm font-black text-red-600 whitespace-nowrap leading-tight">{formatCurrency(summary.totalDebt)}</div>
+              <div className="mt-1 text-[10px] text-slate-400 truncate">{debtTransactions.length} bill{debtTransactions.length !== 1 ? "s" : ""}</div>
+            </div>
+            <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-2 text-center min-w-0">
+              <div className="text-[9px] font-bold uppercase tracking-wide text-emerald-700 leading-tight whitespace-nowrap">Received</div>
+              <div className="mt-1 text-[12px] min-[360px]:text-xs min-[400px]:text-sm font-black text-emerald-600 whitespace-nowrap leading-tight">{formatCurrency(summary.totalReceived)}</div>
+              <div className="mt-1 text-[10px] text-slate-400 truncate">{paymentTransactions.length} payment{paymentTransactions.length !== 1 ? "s" : ""}</div>
+            </div>
+            <div className={`rounded-xl p-2 text-center min-w-0 border ${isAdvance ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
+              <div className={`text-[9px] font-bold uppercase tracking-wide leading-tight whitespace-nowrap ${isAdvance ? "text-emerald-700" : "text-amber-700"}`}>Outstanding</div>
+              <div className={`mt-1 text-[12px] min-[360px]:text-xs min-[400px]:text-sm font-black whitespace-nowrap leading-tight ${isAdvance ? "text-emerald-700" : "text-amber-700"}`}>
+                {isAdvance ? formatCurrency(Math.abs(summary.outstandingBalance)) : formatCurrency(summary.outstandingBalance)}
+              </div>
+              <div className="mt-1 text-[10px] text-slate-400">{isAdvance ? "advance" : "due"}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop: 3 Metric Cards (locked) */}
+        <div className="hidden sm:grid mt-6 grid-cols-3 gap-4 border-t border-slate-100 pt-5">
+          <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100 min-w-0 overflow-hidden">
             <span className="text-xs font-bold text-slate-500">{t("totalDebtBills")}</span>
-            <div className="mt-1 text-2xl font-black text-slate-900">
+            <div className="mt-1 text-2xl font-black text-slate-900 break-words">
               {formatCurrency(summary.totalDebt)}
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-[11px] text-slate-400 mt-0.5 break-words">
               {t("billsAddedCount", { count: debtTransactions.length })}
             </p>
           </div>
 
-          <div className="rounded-2xl bg-emerald-50/60 p-4 border border-emerald-100">
+          <div className="rounded-2xl bg-emerald-50/60 p-4 border border-emerald-100 min-w-0 overflow-hidden">
             <span className="text-xs font-bold text-emerald-800">{t("paymentsReceived")}</span>
-            <div className="mt-1 text-2xl font-black text-emerald-700">
+            <div className="mt-1 text-2xl font-black text-emerald-700 break-words">
               {formatCurrency(summary.totalReceived)}
             </div>
-            <p className="text-[11px] text-emerald-600 mt-0.5">
+            <p className="text-[11px] text-emerald-600 mt-0.5 break-words">
               {t("paymentsCollectedCount", { count: paymentTransactions.length })}
             </p>
           </div>
 
-          <div className={`rounded-2xl p-4 border ${isAdvance ? "bg-emerald-50 border-emerald-200" : "bg-red-50/80 border-red-200"}`}>
+          <div className={`rounded-2xl p-4 border min-w-0 overflow-hidden ${isAdvance ? "bg-emerald-50 border-emerald-200" : "bg-red-50/80 border-red-200"}`}>
             <span className={`text-xs font-bold ${isAdvance ? "text-emerald-800" : "text-red-800"}`}>
               {isAdvance ? t("advanceCreditBalance") : t("outstandingBalanceDue")}
             </span>
-            <div className={`mt-1 text-2xl font-black ${isAdvance ? "text-emerald-800" : "text-red-700"}`}>
+            <div className={`mt-1 text-2xl font-black break-words ${isAdvance ? "text-emerald-800" : "text-red-700"}`}>
               {isAdvance ? formatCurrency(Math.abs(summary.outstandingBalance)) : formatCurrency(summary.outstandingBalance)}
             </div>
-            <p className={`text-[11px] mt-0.5 ${isAdvance ? "text-emerald-600" : "text-red-500"}`}>
+            <p className={`text-[11px] mt-0.5 break-words ${isAdvance ? "text-emerald-600" : "text-red-500"}`}>
               {isAdvance ? t("excessAdvanceMsg") : t("balanceFormulaMsg")}
             </p>
           </div>
@@ -780,41 +810,56 @@ export function CustomerLedgerView({
       </div>
 
       {/* TWO SEPARATED VISUAL SECTIONS (LEFT: DEBT | RIGHT: PAYMENT RECEIVED) */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2 min-w-0">
         {/* LEFT COLUMN: DEBT (BILLS & CREDIT PURCHASES) */}
-        <div className="rounded-3xl border border-red-100 bg-white shadow-xs overflow-hidden">
-          <div className="bg-red-50/80 px-6 py-4 border-b border-red-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-red-600 text-white text-xs font-bold">
+        <div className="rounded-2xl sm:rounded-3xl border border-red-100 bg-white shadow-xs overflow-hidden min-w-0">
+          <div className="bg-red-50/80 px-4 sm:px-6 py-4 border-b border-red-100 flex items-center justify-between gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-red-600 text-white text-xs font-bold">
                 D
               </span>
-              <h3 className="text-base font-black text-red-950">{t("debtColumnTitle")}</h3>
+              <h3 className="text-sm sm:text-base font-black text-red-950 truncate">{t("debtColumnTitle")}</h3>
             </div>
-            <span className="text-xs font-bold text-red-700">
+            <span className="text-xs font-bold text-red-700 shrink-0 whitespace-nowrap">
               {t("entriesCount", { count: debtTransactions.length })}
             </span>
           </div>
 
-          <div className="divide-y divide-slate-100">
+          {/* Mobile compact Debt summary — replaces full list on phone */}
+          <div className="sm:hidden p-4 space-y-3">
+            <div className="text-center">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Total Debt</div>
+              <div className="mt-1 text-2xl font-black text-red-600 whitespace-nowrap">{formatCurrency(summary.totalDebt)}</div>
+            </div>
+            <Link
+              href={`/billing/${customer.locationId}/customers/${customer.id}/history`}
+              className="flex w-full min-h-[44px] items-center justify-center gap-1 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white shadow-xs hover:bg-slate-800 transition"
+            >
+              View All Transactions <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          {/* Desktop full Debt list — hidden on mobile */}
+          <div className="hidden sm:block divide-y divide-slate-100">
             {displayTxs.filter((tx) => tx.type === "DEBT").length > 0 ? (
               displayTxs.filter((tx) => tx.type === "DEBT").map((txItem) => (
-                <div key={txItem.id} className="p-4 sm:p-5 hover:bg-slate-50/60 transition flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                <div key={txItem.id} className="p-3 sm:p-5 hover:bg-slate-50/60 transition flex items-start justify-between gap-3 sm:gap-4 min-w-0">
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
                       {txItem.billNumber ? (
-                        <span className="rounded-lg bg-slate-900 px-2 py-0.5 font-mono text-[11px] font-bold text-white">
+                        <span className="rounded-lg bg-slate-900 px-2 py-0.5 font-mono text-[11px] font-bold text-white break-all">
                           {txItem.billNumber}
                         </span>
                       ) : null}
-                      <span className="text-xs font-semibold text-slate-800">
+                      <span className="text-xs font-semibold text-slate-800 break-words min-w-0">
                         {txItem.description || "Purchase Bill"}
                       </span>
                     </div>
 
-                    <div className="text-[11px] text-slate-500 flex items-center gap-2">
-                      <span>{formatDate(txItem.transactionDate, "dd MMM yyyy, hh:mm a")}</span>
-                      <span>•</span>
-                      <span>{t("addedBy")}: <strong className="text-slate-700">{txItem.createdByName}</strong></span>
+                    <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5 min-w-0 break-words">
+                      <span className="break-words">{formatDate(txItem.transactionDate, "dd MMM yyyy, hh:mm a")}</span>
+                      <span className="shrink-0">•</span>
+                      <span className="break-words">{t("addedBy")}: <strong className="text-slate-700">{txItem.createdByName}</strong></span>
                     </div>
 
                     {(txItem.billImageKey || txItem.billImageUrl) && (
@@ -828,13 +873,13 @@ export function CustomerLedgerView({
                     )}
                   </div>
 
-                  <div className="flex items-start gap-2">
-                    <div className="text-right">
-                      <div className="text-base font-black text-red-600">
+                  <div className="flex items-start gap-1.5 sm:gap-2 shrink-0">
+                    <div className="text-right min-w-0">
+                      <div className="text-sm sm:text-base font-black text-red-600 whitespace-nowrap">
                         {formatCurrency(txItem.amount)}
                       </div>
                       {txItem.runningBalance !== undefined && (
-                        <div className="text-[10px] text-slate-400 mt-0.5">
+                        <div className="text-[10px] text-slate-400 mt-0.5 whitespace-nowrap">
                           {t("balance")}: {formatCurrency(txItem.runningBalance)}
                         </div>
                       )}
@@ -867,37 +912,52 @@ export function CustomerLedgerView({
         </div>
 
         {/* RIGHT COLUMN: PAYMENT RECEIVED */}
-        <div className="rounded-3xl border border-emerald-100 bg-white shadow-xs overflow-hidden">
-          <div className="bg-emerald-50/80 px-6 py-4 border-b border-emerald-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-600 text-white text-xs font-bold">
+        <div className="rounded-2xl sm:rounded-3xl border border-emerald-100 bg-white shadow-xs overflow-hidden min-w-0">
+          <div className="bg-emerald-50/80 px-4 sm:px-6 py-4 border-b border-emerald-100 flex items-center justify-between gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white text-xs font-bold">
                 P
               </span>
-              <h3 className="text-base font-black text-emerald-950">{t("paymentColumnTitle")}</h3>
+              <h3 className="text-sm sm:text-base font-black text-emerald-950 truncate">{t("paymentColumnTitle")}</h3>
             </div>
-            <span className="text-xs font-bold text-emerald-700">
+            <span className="text-xs font-bold text-emerald-700 shrink-0 whitespace-nowrap">
               {t("entriesCount", { count: paymentTransactions.length })}
             </span>
           </div>
 
-          <div className="divide-y divide-slate-100">
+          {/* Mobile compact Payments summary */}
+          <div className="sm:hidden p-4 space-y-3">
+            <div className="text-center">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Payments Received</div>
+              <div className="mt-1 text-2xl font-black text-emerald-600 whitespace-nowrap">{formatCurrency(summary.totalReceived)}</div>
+              <div className="mt-1 text-[11px] text-slate-400">{paymentTransactions.length} payment{paymentTransactions.length !== 1 ? "s" : ""} collected</div>
+            </div>
+            <Link
+              href={`/billing/${customer.locationId}/customers/${customer.id}/history`}
+              className="flex w-full min-h-[44px] items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition"
+            >
+              View All Transactions <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          <div className="hidden sm:block divide-y divide-slate-100">
             {displayTxs.filter((tx) => tx.type === "PAYMENT_RECEIVED").length > 0 ? (
               displayTxs.filter((tx) => tx.type === "PAYMENT_RECEIVED").map((txItem) => (
-                <div key={txItem.id} className="p-4 sm:p-5 hover:bg-slate-50/60 transition flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+                <div key={txItem.id} className="p-3 sm:p-5 hover:bg-slate-50/60 transition flex items-start justify-between gap-3 sm:gap-4 min-w-0">
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      <span className="rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800 break-all">
                         {txItem.paymentMethod || "CASH"}
                       </span>
                       {txItem.description && (
-                        <span className="text-xs font-semibold text-slate-800">{txItem.description}</span>
+                        <span className="text-xs font-semibold text-slate-800 break-words min-w-0">{txItem.description}</span>
                       )}
                     </div>
 
-                    <div className="text-[11px] text-slate-500 flex items-center gap-2">
-                      <span>{formatDate(txItem.transactionDate, "dd MMM yyyy, hh:mm a")}</span>
-                      <span>•</span>
-                      <span>{t("addedBy")}: <strong className="text-slate-700">{txItem.createdByName}</strong></span>
+                    <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5 min-w-0 break-words">
+                      <span className="break-words">{formatDate(txItem.transactionDate, "dd MMM yyyy, hh:mm a")}</span>
+                      <span className="shrink-0">•</span>
+                      <span className="break-words">{t("addedBy")}: <strong className="text-slate-700">{txItem.createdByName}</strong></span>
                     </div>
                     {(txItem.billImageKey || txItem.billImageUrl) && (
                       <button
@@ -910,20 +970,20 @@ export function CustomerLedgerView({
                     )}
                   </div>
 
-                  <div className="flex items-start gap-2">
-                    <div className="text-right">
-                      <div className="text-base font-black text-emerald-600">
+                  <div className="flex items-start gap-1.5 sm:gap-2 shrink-0">
+                    <div className="text-right min-w-0">
+                      <div className="text-sm sm:text-base font-black text-emerald-600 whitespace-nowrap">
                         {formatCurrency(txItem.amount)}
                       </div>
                       {txItem.runningBalance !== undefined && (
-                        <div className="text-[10px] text-slate-400 mt-0.5">
+                        <div className="text-[10px] text-slate-400 mt-0.5 whitespace-nowrap">
                           {t("balance")}: {formatCurrency(txItem.runningBalance)}
                         </div>
                       )}
                     </div>
                     <button
                       onClick={() => openEditModal(txItem)}
-                      className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition shrink-0"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
                       title={t("edit")}
                       aria-label="Edit"
                     >
@@ -931,7 +991,7 @@ export function CustomerLedgerView({
                     </button>
                     <button
                       onClick={() => setDeleteTxTarget(txItem)}
-                      className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-300 hover:bg-red-50 hover:text-red-600 transition shrink-0"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-300 hover:bg-red-50 hover:text-red-600 transition"
                       title="Delete Payment"
                       aria-label="Delete"
                     >
@@ -941,7 +1001,7 @@ export function CustomerLedgerView({
                 </div>
               ))
             ) : (
-              <div className="p-8 text-center text-slate-400 text-xs">
+              <div className="p-8 text-center text-slate-400 text-xs break-words">
                 {t("noPaymentRecords")}
               </div>
             )}
@@ -949,10 +1009,28 @@ export function CustomerLedgerView({
         </div>
       </div>
 
+      {/* Mobile floating action bar — Add Debt + Add Payment (phone only) */}
+      <div className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 border-t border-slate-200 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex gap-3">
+        <button
+          onClick={() => setIsAddDebtOpen(true)}
+          className="flex-1 inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-2xl bg-red-600 px-3 py-3 text-[13px] font-bold text-white shadow-lg hover:bg-red-700 active:scale-[0.98] transition whitespace-nowrap"
+        >
+          <Plus className="h-4 w-4 shrink-0" />
+          <span>Add Debt</span>
+        </button>
+        <button
+          onClick={() => setIsAddPaymentOpen(true)}
+          className="flex-1 inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-2xl bg-emerald-600 px-3 py-3 text-[13px] font-bold text-white shadow-lg hover:bg-emerald-700 active:scale-[0.98] transition whitespace-nowrap"
+        >
+          <ArrowDownLeft className="h-4 w-4 shrink-0" />
+          <span>Add Payment</span>
+        </button>
+      </div>
+
       {/* ADD DEBT MODAL */}
       {isAddDebtOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl sm:rounded-3xl bg-white p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-slate-900">{t("addDebtModalTitle", { name: customer.name })}</h3>
 
             <form onSubmit={handleAddDebt} className="mt-4 space-y-3.5">
@@ -1081,8 +1159,8 @@ export function CustomerLedgerView({
 
       {/* ADD PAYMENT MODAL */}
       {isAddPaymentOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl sm:rounded-3xl bg-white p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-slate-900">{t("addPaymentModalTitle", { name: customer.name })}</h3>
 
             <form onSubmit={handleAddPayment} className="mt-4 space-y-3.5">
@@ -1157,8 +1235,8 @@ export function CustomerLedgerView({
 
       {/* EDIT TRANSACTION MODAL */}
       {editingTx && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl sm:rounded-3xl bg-white p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-slate-900">
               {editingTx.type === "DEBT"
                 ? t("addDebtModalTitle", { name: customer.name })

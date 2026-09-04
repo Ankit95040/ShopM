@@ -252,40 +252,40 @@ export function InventoryDashboard({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       {/* Header & Quick Action Buttons */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between min-w-0">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl sm:text-3xl font-black tracking-tight text-slate-900 break-words">
             {t("inventoryTitle")}
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5 break-words">
             {t("inventorySubtitle")}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
           <Link
             href="/inventory/history"
-            className="flex items-center gap-1.5 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-xs sm:text-sm font-bold text-slate-700 shadow-xs hover:bg-slate-50 transition"
+            className="flex items-center justify-center gap-1.5 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-xs hover:bg-slate-50 transition min-h-[44px]"
           >
-            <History className="h-4 w-4" />
+            <History className="h-4 w-4 shrink-0" />
             <span>{t("movementHistoryBtn")}</span>
           </Link>
 
           <button
             onClick={() => setIsAddCategoryOpen(true)}
-            className="flex items-center gap-1.5 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-xs sm:text-sm font-bold text-slate-700 shadow-xs hover:bg-slate-50 transition"
+            className="flex items-center justify-center gap-1.5 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-xs hover:bg-slate-50 transition min-h-[44px]"
           >
-            <FolderPlus className="h-4 w-4 text-sky-600" />
+            <FolderPlus className="h-4 w-4 shrink-0 text-sky-600" />
             <span>{t("addCategoryBtn")}</span>
           </button>
 
           <button
             onClick={() => setIsAddItemOpen(true)}
-            className="flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-slate-800 transition active:scale-98"
+            className="flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-md hover:bg-slate-800 transition active:scale-98 min-h-[44px]"
           >
-            <Plus className="h-4 w-4 text-sky-400" />
+            <Plus className="h-4 w-4 shrink-0 text-sky-400" />
             <span>{t("addNewItemBtn")}</span>
           </button>
         </div>
@@ -379,8 +379,47 @@ export function InventoryDashboard({
         </div>
       </div>
 
-      {/* Items Table */}
-      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xs">
+      {/* Items — Mobile cards */}
+      <div className="md:hidden space-y-3">
+        {filtered.length > 0 ? (
+          filtered.map((item) => (
+            <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs min-w-0 overflow-hidden">
+              <div className="flex items-start justify-between gap-2 min-w-0">
+                <div className="min-w-0 flex-1">
+                  <div className="font-extrabold text-sm text-slate-900 break-words">{item.name}</div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-bold text-slate-700 break-words">{item.categoryName}</span>
+                    <span className="font-bold text-slate-600 break-words">{item.unit}</span>
+                  </div>
+                </div>
+                <span className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-extrabold whitespace-nowrap ${item.isOutOfStock ? "bg-red-100 text-red-800" : item.isLowStock ? "bg-amber-100 text-amber-900" : "bg-emerald-100 text-emerald-800"}`}>
+                  {item.isOutOfStock ? t("outOfStockBadge") : item.isLowStock ? t("lowStockBadge") : t("inStockBadge")}
+                </span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-slate-50 border border-slate-100 p-3 text-center">
+                <div className="min-w-0">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Stock</div>
+                  <div className="text-sm font-black text-slate-900 break-words">{formatNumber(item.currentStock, 1)}</div>
+                  <div className="text-[10px] text-slate-400 break-words">Min {item.minStockThreshold}</div>
+                </div>
+                <div className="min-w-0 border-l border-slate-200 pl-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Price</div>
+                  <div className="text-xs font-black text-slate-900 break-words">{item.sellingPrice ? formatCurrency(item.sellingPrice) : "-"}</div>
+                </div>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button onClick={() => { setActiveItem(item); setIsAddStockOpen(true); }} className="flex-1 inline-flex min-h-[44px] items-center justify-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white">+ Add</button>
+                <button onClick={() => { setActiveItem(item); setIsRemoveStockOpen(true); }} className="flex-1 inline-flex min-h-[44px] items-center justify-center gap-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700">- Remove</button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm font-semibold text-slate-600 break-words">No items found</div>
+        )}
+      </div>
+
+      {/* Items Table — Desktop (≥768px) unchanged */}
+      <div className="hidden md:block overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xs">
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
             <tr>

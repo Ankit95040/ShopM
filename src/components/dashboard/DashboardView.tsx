@@ -9,6 +9,7 @@ import {
   X,
   FileText,
   Loader2,
+  Plus,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { useTranslation } from "@/lib/i18n";
@@ -156,9 +157,9 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
   const hasMoreMovements = totalMovementCount > recentMovements.length;
 
   return (
-    <div className="p-4 sm:p-8 space-y-8 max-w-7xl mx-auto">
+    <div className="p-3 sm:p-8 space-y-5 sm:space-y-8 max-w-7xl mx-auto min-w-0">
       {!isDbConnected && (
-        <div className="rounded-3xl border border-amber-300 bg-amber-50 p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
+        <div className="rounded-2xl sm:rounded-3xl border border-amber-300 bg-amber-50 p-4 sm:p-5 shadow-xs flex flex-wrap items-center justify-between gap-4 min-w-0">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white font-black">
               !
@@ -176,40 +177,69 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
         </div>
       )}
 
-      {/* Dynamic User Greeting & Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
+      {/* Mobile greeting — compact, friendly */}
+      <div className="block md:hidden min-w-0">
+        <h1 className="text-[22px] leading-tight font-black text-slate-900 tracking-tight">Namaste 🙏</h1>
+        <p className="text-xs text-slate-500 mt-1 leading-snug">Manage your shop with ease.</p>
+      </div>
+      {/* Desktop greeting — locked */}
+      <div className="hidden md:flex flex-wrap items-center justify-between gap-4 min-w-0">
+        <div className="min-w-0 flex-1">
           <span className="text-xs font-bold text-sky-600 uppercase tracking-widest">
             {t("storeCommandCenter")}
           </span>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight sm:text-4xl">
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight break-words">
             {greetingText}
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-slate-500 mt-1 leading-snug break-words">
             {t("dashboardSubtitle")}
           </p>
         </div>
       </div>
 
-      {/* TWO PRIMARY MODULE CARDS */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+      {/* Mobile module cards — compact, tappable, short descriptions */}
+      <div className="grid md:hidden grid-cols-1 gap-3 min-w-0">
+        <Link href="/billing" className="flex items-center gap-3 rounded-2xl bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-4 text-white shadow-md border border-slate-700/50 active:scale-[0.99] transition min-w-0">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white">
+            <Receipt className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-black tracking-tight leading-none">BILLING & KHATA</div>
+            <div className="text-[11px] text-slate-300 leading-tight mt-0.5">Customers, dues & payments</div>
+          </div>
+          <ArrowRight className="h-4 w-4 shrink-0 text-sky-400" />
+        </Link>
+        <Link href="/inventory" className="flex items-center gap-3 rounded-2xl bg-linear-to-br from-sky-950 via-slate-900 to-sky-950 p-4 text-white shadow-md border border-sky-900/50 active:scale-[0.99] transition min-w-0">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white">
+            <Boxes className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-black tracking-tight leading-none">INVENTORY & STOCK</div>
+            <div className="text-[11px] text-slate-300 leading-tight mt-0.5">Manage your shop stock</div>
+          </div>
+          <ArrowRight className="h-4 w-4 shrink-0 text-emerald-400" />
+        </Link>
+      </div>
+
+      {/* Desktop module cards — locked */}
+      <div className="hidden md:grid grid-cols-2 gap-6 min-w-0">
         {/* 1. BILLING CARD */}
         <Link
           href="/billing"
-          className="group relative flex flex-col justify-between overflow-hidden rounded-3xl bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-8 text-white shadow-xl transition-all hover:scale-101 hover:shadow-2xl active:scale-99 border border-slate-700/50"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-3xl bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-8 text-white shadow-xl transition-all hover:scale-101 hover:shadow-2xl active:scale-99 border border-slate-700/50 min-w-0"
         >
-          <div>
-            <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center justify-between gap-2">
               <span className="rounded-full bg-sky-500/20 px-3 py-1 text-xs font-black text-sky-300 border border-sky-400/30">
                 {t("module1Badge")}
               </span>
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-white backdrop-blur group-hover:bg-sky-500 transition">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white backdrop-blur group-hover:bg-sky-500 transition">
                 <Receipt className="h-6 w-6" />
               </div>
             </div>
 
-            <h2 className="mt-6 text-3xl font-black tracking-tight">{t("module1Title")}</h2>
-            <p className="mt-2 text-xs text-slate-300 leading-relaxed">
+            <h2 className="mt-6 text-3xl font-black tracking-tight break-words">{t("module1Title")}</h2>
+            <p className="mt-2 text-xs text-slate-300 leading-relaxed break-words">
               {t("module1Desc")}
             </p>
           </div>
@@ -217,7 +247,7 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
           <div className="mt-8 border-t border-slate-700/60 pt-6">
             <div className="flex items-center justify-between text-xs font-bold text-sky-400">
               <span>{t("openBillingLocations")}</span>
-              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition" />
+              <ArrowRight className="h-4 w-4 shrink-0 group-hover:translate-x-1 transition" />
             </div>
           </div>
         </Link>
@@ -225,20 +255,20 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
         {/* 2. INVENTORY CARD */}
         <Link
           href="/inventory"
-          className="group relative flex flex-col justify-between overflow-hidden rounded-3xl bg-linear-to-br from-sky-950 via-slate-900 to-sky-950 p-8 text-white shadow-xl transition-all hover:scale-101 hover:shadow-2xl active:scale-99 border border-sky-900/50"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-3xl bg-linear-to-br from-sky-950 via-slate-900 to-sky-950 p-8 text-white shadow-xl transition-all hover:scale-101 hover:shadow-2xl active:scale-99 border border-sky-900/50 min-w-0"
         >
-          <div>
-            <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center justify-between gap-2">
               <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-black text-emerald-300 border border-emerald-400/30">
                 {t("module2Badge")}
               </span>
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-white backdrop-blur group-hover:bg-emerald-500 transition">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white backdrop-blur group-hover:bg-emerald-500 transition">
                 <Boxes className="h-6 w-6" />
               </div>
             </div>
 
-            <h2 className="mt-6 text-3xl font-black tracking-tight">{t("module2Title")}</h2>
-            <p className="mt-2 text-xs text-slate-300 leading-relaxed">
+            <h2 className="mt-6 text-3xl font-black tracking-tight break-words">{t("module2Title")}</h2>
+            <p className="mt-2 text-xs text-slate-300 leading-relaxed break-words">
               {t("module2Desc")}
             </p>
           </div>
@@ -246,28 +276,51 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
           <div className="mt-8 border-t border-slate-700/60 pt-6">
             <div className="flex items-center justify-between text-xs font-bold text-emerald-400">
               <span>{t("manageShopStock")}</span>
-              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition" />
+              <ArrowRight className="h-4 w-4 shrink-0 group-hover:translate-x-1 transition" />
             </div>
           </div>
         </Link>
       </div>
 
-      <div className="flex justify-end">
-        <Link href="/members" className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 transition">
+      <div className="flex justify-end -mt-1 sm:mt-0 md:mt-0">
+        <Link href="/members" className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 transition min-h-[32px] px-2 -mx-2">
           Manage Team <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>
 
+      {/* Mobile Quick Actions — thumb-friendly, side-by-side */}
+      <div className="block md:hidden min-w-0">
+        <h3 className="text-[11px] font-black tracking-widest text-slate-500 uppercase mb-2">Quick Actions</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <Link href="/billing" className="flex items-center justify-center gap-2 rounded-2xl bg-white border border-slate-200 p-3 min-h-[48px] text-sm font-bold text-slate-900 shadow-xs active:scale-[0.98] transition min-w-0">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600"><Plus className="h-4 w-4" /></span>
+            <span className="truncate">Add Debt</span>
+          </Link>
+          <Link href="/billing" className="flex items-center justify-center gap-2 rounded-2xl bg-white border border-slate-200 p-3 min-h-[48px] text-sm font-bold text-slate-900 shadow-xs active:scale-[0.98] transition min-w-0">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"><ArrowRight className="h-4 w-4 rotate-90" /></span>
+            <span className="truncate">Add Payment</span>
+          </Link>
+          <Link href="/billing" className="flex items-center justify-center gap-2 rounded-2xl bg-white border border-slate-200 p-3 min-h-[48px] text-sm font-bold text-slate-900 shadow-xs active:scale-[0.98] transition min-w-0">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600"><FileText className="h-4 w-4" /></span>
+            <span className="truncate">Customer</span>
+          </Link>
+          <Link href="/inventory" className="flex items-center justify-center gap-2 rounded-2xl bg-white border border-slate-200 p-3 min-h-[48px] text-sm font-bold text-slate-900 shadow-xs active:scale-[0.98] transition min-w-0">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600"><Boxes className="h-4 w-4" /></span>
+            <span className="truncate">Stock</span>
+          </Link>
+        </div>
+      </div>
+
       {/* DASHBOARD CONTENT: Recent Transactions + Inventory Summary */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2 min-w-0">
         {/* Recent Transactions Section */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <div className="flex items-center gap-2">
-              <Receipt className="h-5 w-5 text-sky-600" />
-              <h3 className="text-base font-black text-slate-900">{t("recentTransactions")}</h3>
+        <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-xs space-y-3 sm:space-y-4 min-w-0">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3 sm:pb-4 gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Receipt className="h-5 w-5 shrink-0 text-sky-600" />
+              <h3 className="text-sm sm:text-base font-black text-slate-900 truncate">{t("recentTransactions")}</h3>
             </div>
-            <Link href="/reports" className="text-xs font-bold text-sky-600 hover:underline">
+            <Link href="/reports" className="text-xs font-bold text-sky-600 hover:underline shrink-0">
               {t("viewReports")}
             </Link>
           </div>
@@ -323,13 +376,13 @@ export function DashboardView({ data }: { data: DashboardMetrics }) {
         </div>
 
         {/* Inventory Overview Section */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <div className="flex items-center gap-2">
-              <Boxes className="h-5 w-5 text-emerald-600" />
-              <h3 className="text-base font-black text-slate-900">{t("inventoryStockSummary")}</h3>
+        <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-xs space-y-3 sm:space-y-4 min-w-0">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3 sm:pb-4 gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Boxes className="h-5 w-5 shrink-0 text-emerald-600" />
+              <h3 className="text-sm sm:text-base font-black text-slate-900 truncate">{t("inventoryStockSummary")}</h3>
             </div>
-            <Link href="/inventory" className="text-xs font-bold text-emerald-600 hover:underline">
+            <Link href="/inventory" className="text-xs font-bold text-emerald-600 hover:underline shrink-0">
               {t("viewItemsArrow")}
             </Link>
           </div>

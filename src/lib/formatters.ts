@@ -5,13 +5,15 @@ export function formatCurrency(
   currency: string = "INR"
 ): string {
   const num = typeof amount === "string" ? parseFloat(amount) : (amount ?? 0);
-  if (isNaN(num)) return "₹0.00";
+  if (isNaN(num)) return "₹0";
 
+  const hasFraction = Math.abs(num % 1) > 0.000001;
+  const fractionDigits = hasFraction ? 2 : 0;
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: currency,
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
+    maximumFractionDigits: fractionDigits,
+    minimumFractionDigits: fractionDigits,
   }).format(num);
 }
 

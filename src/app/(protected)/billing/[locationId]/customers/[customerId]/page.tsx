@@ -22,7 +22,7 @@ export default async function CustomerLedgerPage({
   }
 
   return (
-    <div className="p-4 sm:p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-8 max-w-7xl mx-auto min-w-0">
       <CustomerLedgerView initialData={res.data} />
     </div>
   );

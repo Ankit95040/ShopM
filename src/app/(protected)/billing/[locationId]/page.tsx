@@ -36,7 +36,7 @@ export default async function LocationCustomersPage({
   const customers = res.success && res.customers ? res.customers : [];
 
   return (
-    <div className="p-4 sm:p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-8 max-w-7xl mx-auto min-w-0">
       <CustomerTable
         initialCustomers={customers}
         locationId={locationId}

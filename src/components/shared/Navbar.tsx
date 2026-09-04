@@ -117,13 +117,13 @@ export function Navbar({
         </nav>
 
         {/* Right Section: Language Toggle + Recycle Bin Icon + User Badge */}
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 ml-auto">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 ml-auto min-w-0">
           {/* Recycle Bin Icon Button */}
           <Link
             href="/recycle-bin"
             title={t("recycleBinNav")}
             className={cn(
-              "inline-flex h-9 w-9 items-center justify-center rounded-full transition",
+              "inline-flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-full transition shrink-0",
               pathname === "/recycle-bin"
                 ? "bg-slate-900 text-white shadow-xs"
                 : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
@@ -136,7 +136,7 @@ export function Navbar({
           <button
             onClick={toggleLanguage}
             title={language === "en" ? "Switch to Hindi (\u0939\u093F\u0902\u0926\u0940)" : "Switch to English"}
-            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-slate-300 bg-slate-50 px-2.5 sm:px-3 text-xs font-bold leading-none text-slate-800 hover:bg-slate-100 hover:border-slate-400 transition active:scale-95 shadow-2xs"
+            className="inline-flex h-11 sm:h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-slate-300 bg-slate-50 px-2.5 sm:px-3 text-xs font-bold leading-none text-slate-800 hover:bg-slate-100 hover:border-slate-400 transition active:scale-95 shadow-2xs min-w-0"
           >
             <Languages className="h-3.5 w-3.5 shrink-0 text-sky-600" />
             <span className="text-[11px] uppercase tracking-wider whitespace-nowrap">
@@ -166,7 +166,7 @@ export function Navbar({
                 <button
                   type="submit"
                   title="Logout"
-                  className="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-red-200 bg-white px-2.5 sm:px-3 text-xs font-bold leading-none text-red-600 hover:bg-red-50 hover:border-red-300 transition"
+                  className="inline-flex h-11 w-11 sm:h-9 sm:w-auto items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-red-200 bg-white px-2.5 sm:px-3 text-xs font-bold leading-none text-red-600 hover:bg-red-50 hover:border-red-300 transition shrink-0"
                 >
                   <LogOut className="h-3.5 w-3.5 shrink-0 text-red-400" />
                   <span className="hidden sm:inline whitespace-nowrap">Logout</span>
@@ -178,7 +178,7 @@ export function Navbar({
       </div>
 
       {/* Mobile Navigation Bar */}
-      <div className="flex sm:hidden items-center justify-around gap-1 border-t border-slate-100 bg-slate-50 px-2 py-1.5">
+      <div className="flex sm:hidden items-center justify-around gap-0.5 border-t border-slate-100 bg-slate-50 px-1 py-1">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const isActive =
@@ -190,12 +190,12 @@ export function Navbar({
               key={item.href}
               href={item.href}
               className={cn(
-                "inline-flex flex-col items-center justify-center gap-0.5 whitespace-nowrap rounded-lg px-2 py-1.5 text-[10px] font-bold leading-none min-w-0 flex-1",
+                "inline-flex flex-col items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1 py-2 text-[10px] font-bold leading-none min-w-0 flex-1 min-h-[48px]",
                 isActive ? "text-sky-600 font-black" : "text-slate-600"
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              <span className="whitespace-nowrap leading-none truncate">{t(item.key)}</span>
+              <span className="whitespace-nowrap leading-none truncate max-w-[60px]">{t(item.key)}</span>
             </Link>
           );
         })}
@@ -203,10 +203,10 @@ export function Navbar({
           <button
             type="button"
             onClick={() => setIsAccountOpen(true)}
-            className="inline-flex flex-col items-center justify-center gap-0.5 whitespace-nowrap rounded-lg px-2 py-1.5 text-[10px] font-bold leading-none min-w-0 flex-1 text-slate-600"
+            className="inline-flex flex-col items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1 py-2 text-[10px] font-bold leading-none min-w-0 flex-1 text-slate-600 min-h-[48px]"
           >
             <User className="h-4 w-4 shrink-0" />
-            <span className="whitespace-nowrap leading-none truncate">{t("account")}</span>
+            <span className="whitespace-nowrap leading-none truncate max-w-[60px]">{t("account")}</span>
           </button>
         )}
       </div>
