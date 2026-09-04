@@ -15,7 +15,7 @@ export function DemoBanner() {
         <div className="flex items-start gap-2 text-xs font-medium text-amber-900">
           <FlaskConical className="h-4 w-4 shrink-0 text-amber-600 mt-0.5 sm:mt-0" />
           <span className="leading-relaxed">
-            You’re using ShopM in demo mode. Your data is temporary. To keep your data, log in or register.
+            You’re using ShopM in guest mode. Your data is temporary. To keep your data, log in or register.
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:ml-4">

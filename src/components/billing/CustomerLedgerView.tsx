@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Plus,
@@ -31,6 +32,32 @@ import { useTranslation } from "@/lib/i18n";
 import { ConfirmModal } from "@/components/shared/ConfirmModal";
 import { useToast } from "@/components/shared/ToastContext";
 import { ImageViewer } from "@/components/shared/ImageViewer";
+
+// Returns current time in Asia/Kolkata as YYYY-MM-DDTHH:mm for datetime-local (not UTC)
+function getCurrentKolkataDateTimeLocal(): string {
+  const now = new Date();
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(now).map((p) => [p.type, p.value]));
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
+// Parses YYYY-MM-DDTHH:mm as Asia/Kolkata wall time to correct absolute Date (UTC)
+function kolkataDateTimeLocalToDate(dateTimeLocal: string): Date {
+  const [datePart, timePart] = dateTimeLocal.split("T");
+  if (!datePart || !timePart) return new Date(dateTimeLocal);
+  const [y, m, d] = datePart.split("-").map(Number);
+  const [h, min] = timePart.split(":").map(Number);
+  if ([y, m, d, h, min].some((n) => Number.isNaN(n))) return new Date(dateTimeLocal);
+  return new Date(Date.UTC(y, m - 1, d, h, min) - 5.5 * 60 * 60 * 1000);
+}
 
 export interface TransactionItem {
   id: string;
@@ -78,6 +105,7 @@ export function CustomerLedgerView({
 }) {
   const { t } = useTranslation();
   const toast = useToast();
+  const router = useRouter();
   const [data, setData] = useState(initialData);
 
   // Modals
@@ -90,7 +118,7 @@ export function CustomerLedgerView({
   const [debtBillNo, setDebtBillNo] = useState("");
   const [debtDesc, setDebtDesc] = useState("");
   const [debtImageUrl, setDebtImageUrl] = useState("");
-  const [debtDate, setDebtDate] = useState(new Date().toISOString().slice(0, 16));
+  const [debtDate, setDebtDate] = useState(getCurrentKolkataDateTimeLocal());
 
   // Bill Image Upload State
   const [debtImageFile, setDebtImageFile] = useState<File | null>(null);
@@ -116,9 +144,23 @@ export function CustomerLedgerView({
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
   const [paymentDesc, setPaymentDesc] = useState("");
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 16));
+  const [paymentDate, setPaymentDate] = useState(getCurrentKolkataDateTimeLocal());
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Default Date & Time to current India time when form opens (fixes UTC 5h30m behind)
+  useEffect(() => {
+    if (isAddDebtOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDebtDate(getCurrentKolkataDateTimeLocal());
+    }
+  }, [isAddDebtOpen]);
+  useEffect(() => {
+    if (isAddPaymentOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPaymentDate(getCurrentKolkataDateTimeLocal());
+    }
+  }, [isAddPaymentOpen]);
 
   const [deleteTxTarget, setDeleteTxTarget] = useState<TransactionItem | null>(null);
   const [isDeletingTx, setIsDeletingTx] = useState(false);
@@ -202,15 +244,21 @@ export function CustomerLedgerView({
       return;
     }
 
-    // Validate file size (5MB max)
+    // Validate file size (5MB max) — must match server MAX_FILE_SIZE
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("File too large. Maximum size is 5MB.");
+      toast.error("Image is too large. Please select an image smaller than 5 MB.");
+      // Clear the file input so user can re-select
+      if (debtFileInputRef.current) debtFileInputRef.current.value = "";
+      if (debtCameraInputRef.current) debtCameraInputRef.current.value = "";
       return;
     }
 
     setDebtImageFile(file);
     const previewUrl = URL.createObjectURL(file);
     setDebtImagePreview(previewUrl);
+    // Default transaction date/time to NOW when bill image is selected (Asia/Kolkata)
+    // Preserve manual override: user can still edit the datetime-local input afterwards
+    setDebtDate(getCurrentKolkataDateTimeLocal());
   };
 
   // Remove selected bill image
@@ -257,7 +305,9 @@ export function CustomerLedgerView({
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("File too large. Maximum size is 5MB.");
+      toast.error("Image is too large. Please select an image smaller than 5 MB.");
+      if (editFileInputRef.current) editFileInputRef.current.value = "";
+      if (editCameraInputRef.current) editCameraInputRef.current.value = "";
       return;
     }
     setEditImageFile(file);
@@ -313,71 +363,85 @@ export function CustomerLedgerView({
       toast.error("Change reason is required for audit");
       return;
     }
-    setIsEditSubmitting(true);
-    const res = await editTransactionAction({
-      transactionId: editingTx.id,
-      amount: amt,
-      billNumber: editingTx.type === "DEBT" ? editBillNo : undefined,
-      paymentMethod: editingTx.type === "PAYMENT_RECEIVED" ? editPaymentMethod : undefined,
-      description: editDesc || undefined,
-      changeReason: editChangeReason.trim(),
-    });
-    if (!res.success || !res.transaction) {
-      toast.error(res.error || "Failed to edit transaction");
-      setIsEditSubmitting(false);
+    if (editImageFile && editImageFile.size > 5 * 1024 * 1024) {
+      toast.error("Image is too large. Please select an image smaller than 5 MB.");
       return;
     }
-    let finalBillImageKey: string | null | undefined = editingTx.billImageKey;
-    // Handle image removal or replacement via R2 pipeline
-    if (editRemoveImage && !editImageFile && editingTx.billImageKey) {
-      const rm = await removeBillImage({ transactionId: editingTx.id, customerId: customer.id });
-      if (!rm.success) {
-        toast.error(rm.error || "Failed to remove bill image");
-      } else {
-        finalBillImageKey = null;
+    setIsEditSubmitting(true);
+    try {
+      const res = await editTransactionAction({
+        transactionId: editingTx.id,
+        amount: amt,
+        billNumber: editingTx.type === "DEBT" ? editBillNo : undefined,
+        paymentMethod: editingTx.type === "PAYMENT_RECEIVED" ? editPaymentMethod : undefined,
+        description: editDesc || undefined,
+        changeReason: editChangeReason.trim(),
+      });
+      if (!res.success || !res.transaction) {
+        toast.error(res.error || "Failed to edit transaction");
+        return;
       }
-    } else if (editImageFile) {
-      const formData = new FormData();
-      formData.append("transactionId", editingTx.id);
-      formData.append("customerId", customer.id);
-      formData.append("file", editImageFile);
-      const up = await uploadBillImage(formData);
-      if (!up.success) {
-        toast.error(up.error || "Failed to upload bill image");
-      } else {
-        finalBillImageKey = up.billImageKey || null;
+      let finalBillImageKey: string | null | undefined = editingTx.billImageKey;
+      try {
+        if (editRemoveImage && !editImageFile && editingTx.billImageKey) {
+          const rm = await removeBillImage({ transactionId: editingTx.id, customerId: customer.id });
+          if (!rm.success) {
+            toast.error(rm.error || "Failed to remove bill image");
+          } else {
+            finalBillImageKey = null;
+          }
+        } else if (editImageFile) {
+          const formData = new FormData();
+          formData.append("transactionId", editingTx.id);
+          formData.append("customerId", customer.id);
+          formData.append("file", editImageFile);
+          const up = await uploadBillImage(formData);
+          if (!up.success) {
+            toast.error(up.error || "Failed to upload bill image. Please try again.");
+          } else {
+            finalBillImageKey = up.billImageKey || null;
+          }
+        }
+      } catch (err) {
+        console.error("Image handling failed:", err);
+        toast.error("Image upload failed. Please try again.");
       }
-    }
-    const updated: TransactionItem = {
-      ...editingTx,
-      amount: amt,
-      billNumber: editingTx.type === "DEBT" ? editBillNo || null : editingTx.billNumber,
-      paymentMethod: editingTx.type === "PAYMENT_RECEIVED" ? editPaymentMethod : editingTx.paymentMethod,
-      description: editDesc || null,
-      billImageKey: finalBillImageKey ?? null,
-      billImageUrl: finalBillImageKey ? null : editingTx.billImageUrl,
-    };
-    setData((prev) => {
-      const replace = (arr: TransactionItem[]) => arr.map((t) => (t.id === editingTx.id ? updated : t));
-      const oldAmt = editingTx.amount;
-      const diff = amt - oldAmt;
-      const isDebt = editingTx.type === "DEBT";
-      return {
-        ...prev,
-        summary: {
-          ...prev.summary,
-          totalDebt: isDebt ? prev.summary.totalDebt + diff : prev.summary.totalDebt,
-          totalReceived: !isDebt ? prev.summary.totalReceived + diff : prev.summary.totalReceived,
-          outstandingBalance: isDebt ? prev.summary.outstandingBalance + diff : prev.summary.outstandingBalance - diff,
-        },
-        debtTransactions: isDebt ? replace(prev.debtTransactions) : prev.debtTransactions,
-        paymentTransactions: !isDebt ? replace(prev.paymentTransactions) : prev.paymentTransactions,
-        allTransactions: replace(prev.allTransactions),
+      const updated: TransactionItem = {
+        ...editingTx,
+        amount: amt,
+        billNumber: editingTx.type === "DEBT" ? editBillNo || null : editingTx.billNumber,
+        paymentMethod: editingTx.type === "PAYMENT_RECEIVED" ? editPaymentMethod : editingTx.paymentMethod,
+        description: editDesc || null,
+        billImageKey: finalBillImageKey ?? null,
+        billImageUrl: finalBillImageKey ? null : editingTx.billImageUrl,
       };
-    });
-    toast.success("Transaction updated");
-    closeEditModal();
-    setIsEditSubmitting(false);
+      setData((prev) => {
+        const replace = (arr: TransactionItem[]) => arr.map((t) => (t.id === editingTx.id ? updated : t));
+        const oldAmt = editingTx.amount;
+        const diff = amt - oldAmt;
+        const isDebt = editingTx.type === "DEBT";
+        return {
+          ...prev,
+          summary: {
+            ...prev.summary,
+            totalDebt: isDebt ? prev.summary.totalDebt + diff : prev.summary.totalDebt,
+            totalReceived: !isDebt ? prev.summary.totalReceived + diff : prev.summary.totalReceived,
+            outstandingBalance: isDebt ? prev.summary.outstandingBalance + diff : prev.summary.outstandingBalance - diff,
+          },
+          debtTransactions: isDebt ? replace(prev.debtTransactions) : prev.debtTransactions,
+          paymentTransactions: !isDebt ? replace(prev.paymentTransactions) : prev.paymentTransactions,
+          allTransactions: replace(prev.allTransactions),
+        };
+      });
+      router.refresh();
+      toast.success("Transaction updated");
+      closeEditModal();
+    } catch (err) {
+      console.error("Edit transaction failed:", err);
+      toast.error("Failed to edit transaction. Please try again.");
+    } finally {
+      setIsEditSubmitting(false);
+    }
   };
 
   // Handle Add Debt
@@ -386,32 +450,45 @@ export function CustomerLedgerView({
     const amt = parseFloat(debtAmount);
     if (isNaN(amt) || amt <= 0) return;
 
+    // Enforce 5MB BEFORE any server action — do not create transaction if image too large
+    if (debtImageFile && debtImageFile.size > 5 * 1024 * 1024) {
+      toast.error("Image is too large. Please select an image smaller than 5 MB.");
+      return;
+    }
+
     setIsSubmitting(true);
+    try {
+      const res = await addDebtAction({
+        customerId: customer.id,
+        amount: amt,
+        billNumber: debtBillNo || undefined,
+        description: debtDesc || undefined,
+        transactionDate: kolkataDateTimeLocalToDate(debtDate),
+      });
 
-    const res = await addDebtAction({
-      customerId: customer.id,
-      amount: amt,
-      billNumber: debtBillNo || undefined,
-      description: debtDesc || undefined,
-      transactionDate: new Date(debtDate),
-    });
+      if (!res.success || !res.transaction) {
+        toast.error(res.error || "Failed to add debt. Please try again.");
+        return;
+      }
 
-    if (res.success && res.transaction) {
-      // Upload bill image if selected
       let uploadedBillImageKey: string | null = null;
       if (debtImageFile && res.transaction.id) {
-        const formData = new FormData();
-        formData.append("transactionId", res.transaction.id);
-        formData.append("customerId", customer.id);
-        formData.append("file", debtImageFile);
+        try {
+          const formData = new FormData();
+          formData.append("transactionId", res.transaction.id);
+          formData.append("customerId", customer.id);
+          formData.append("file", debtImageFile);
 
-        const uploadRes = await uploadBillImage(formData);
+          const uploadRes = await uploadBillImage(formData);
 
-        if (uploadRes.success && uploadRes.billImageKey) {
-          uploadedBillImageKey = uploadRes.billImageKey;
-        } else {
-          // Image upload failed, but transaction was created - show warning
-          toast.error(uploadRes.error || "Failed to upload bill image. Transaction was saved without image.");
+          if (uploadRes.success && uploadRes.billImageKey) {
+            uploadedBillImageKey = uploadRes.billImageKey;
+          } else {
+            toast.error(uploadRes.error || "Failed to upload bill image. Transaction was saved without image.");
+          }
+        } catch (err) {
+          console.error("Image upload failed:", err);
+          toast.error("Image upload failed. Please try again.");
         }
       }
 
@@ -423,7 +500,7 @@ export function CustomerLedgerView({
         description: debtDesc || null,
         billImageUrl: debtImageUrl || null,
         billImageKey: uploadedBillImageKey,
-        transactionDate: new Date(debtDate),
+        transactionDate: kolkataDateTimeLocalToDate(debtDate),
         createdByName: "You",
       };
 
@@ -437,12 +514,13 @@ export function CustomerLedgerView({
             totalDebt: newTotalDebt,
             outstandingBalance: newBal,
             transactionCount: prev.summary.transactionCount + 1,
-            lastTransactionDate: new Date(debtDate),
+            lastTransactionDate: kolkataDateTimeLocalToDate(debtDate),
           },
           debtTransactions: [...prev.debtTransactions, newTx],
           allTransactions: [...prev.allTransactions, newTx],
         };
       });
+      router.refresh();
 
       setIsAddDebtOpen(false);
       setDebtAmount("");
@@ -451,11 +529,12 @@ export function CustomerLedgerView({
       setDebtImageUrl("");
       handleRemoveImage();
       toast.success("Bill added successfully");
-    } else {
-      toast.error(res.error || "Failed to add debt");
+    } catch (err) {
+      console.error("Add debt failed:", err);
+      toast.error("Failed to add debt. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setIsSubmitting(false);
   };
 
   // Handle Add Payment
@@ -465,25 +544,27 @@ export function CustomerLedgerView({
     if (isNaN(amt) || amt <= 0) return;
 
     setIsSubmitting(true);
+    try {
+      const res = await addPaymentAction({
+        customerId: customer.id,
+        amount: amt,
+        paymentMethod,
+        description: paymentDesc || undefined,
+        transactionDate: kolkataDateTimeLocalToDate(paymentDate),
+      });
 
-    const res = await addPaymentAction({
-      customerId: customer.id,
-      amount: amt,
-      paymentMethod,
-      description: paymentDesc || undefined,
-      transactionDate: new Date(paymentDate),
-    });
+      if (!res.success || !res.transaction) {
+        toast.error(res.error || "Failed to add payment. Please try again.");
+        return;
+      }
 
-    setIsSubmitting(false);
-
-    if (res.success && res.transaction) {
       const newTx: TransactionItem = {
         id: res.transaction.id,
         type: "PAYMENT_RECEIVED",
         amount: amt,
         paymentMethod,
         description: paymentDesc || null,
-        transactionDate: new Date(paymentDate),
+        transactionDate: kolkataDateTimeLocalToDate(paymentDate),
         createdByName: "You",
       };
 
@@ -497,19 +578,23 @@ export function CustomerLedgerView({
             totalReceived: newTotalRec,
             outstandingBalance: newBal,
             transactionCount: prev.summary.transactionCount + 1,
-            lastTransactionDate: new Date(paymentDate),
+            lastTransactionDate: kolkataDateTimeLocalToDate(paymentDate),
           },
           paymentTransactions: [...prev.paymentTransactions, newTx],
           allTransactions: [...prev.allTransactions, newTx],
         };
       });
+      router.refresh();
 
       setIsAddPaymentOpen(false);
       setPaymentAmount("");
       setPaymentDesc("");
       toast.success("Payment added successfully");
-    } else {
-      toast.error(res.error || "Failed to add payment");
+    } catch (err) {
+      console.error("Add payment failed:", err);
+      toast.error("Failed to add payment. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -517,13 +602,16 @@ export function CustomerLedgerView({
   const handleDeleteTransaction = async () => {
     if (!deleteTxTarget) return;
     setIsDeletingTx(true);
-    const res = await softDeleteTransactionAction({
-      transactionId: deleteTxTarget.id,
-      reason: "Deleted by user",
-    });
-    setIsDeletingTx(false);
+    try {
+      const res = await softDeleteTransactionAction({
+        transactionId: deleteTxTarget.id,
+        reason: "Deleted by user",
+      });
 
-    if (res.success) {
+      if (!res.success) {
+        toast.error(res.error || "Failed to delete transaction. Please try again.");
+        return;
+      }
       setData((prev) => {
         const isDebt = deleteTxTarget.type === "DEBT";
         const amt = deleteTxTarget.amount;
@@ -543,17 +631,21 @@ export function CustomerLedgerView({
           allTransactions: prev.allTransactions.filter((t) => t.id !== deleteTxTarget.id),
         };
       });
+      router.refresh();
       const deletedId = deleteTxTarget.id;
       toast.undo("Transaction deleted successfully", async () => {
         const restoreRes = await restoreTransactionAction(deletedId);
         if (restoreRes.success) {
-          window.location.reload();
+          router.refresh();
         }
       });
-    } else {
-      toast.error("Failed to delete transaction");
+    } catch (err) {
+      console.error("Delete transaction failed:", err);
+      toast.error("Failed to delete transaction. Please try again.");
+    } finally {
+      setIsDeletingTx(false);
+      setDeleteTxTarget(null);
     }
-    setDeleteTxTarget(null);
   };
 
   // WhatsApp Statement Generator (Period-Based)
@@ -1077,6 +1169,16 @@ export function CustomerLedgerView({
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
+                        {(txItem.billImageKey || txItem.billImageUrl) && (
+                          <button
+                            onClick={() => handleViewBillImage(txItem)}
+                            className="flex h-11 w-11 items-center justify-center rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition shrink-0"
+                            aria-label={t("viewBillImage")}
+                            title={t("viewBillImage")}
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                         <button onClick={() => openEditModal(txItem)} className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Edit">
                           <Pencil className="h-3.5 w-3.5" />
                         </button>

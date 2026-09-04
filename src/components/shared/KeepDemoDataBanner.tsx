@@ -37,9 +37,9 @@ export function KeepDemoDataBanner() {
         <div className="flex items-start gap-3">
           <Database className="h-5 w-5 text-sky-600 mt-0.5" />
           <div className="text-xs">
-            <div className="font-bold text-sky-900">Keep your demo data?</div>
+            <div className="font-bold text-sky-900">Keep your guest data?</div>
             <div className="text-sky-700 mt-0.5">
-              You have demo data{counts ? ` (${counts.locations} locations, ${counts.customers} customers, ${counts.transactions} transactions)` : ""}. Copy it to your new shop?
+              You have guest data{counts ? ` (${counts.locations} locations, ${counts.customers} customers, ${counts.transactions} transactions)` : ""}. Copy it to your new shop?
             </div>
           </div>
         </div>
@@ -50,7 +50,7 @@ export function KeepDemoDataBanner() {
             className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50 min-h-[36px]"
           >
             <Copy className="h-3.5 w-3.5" />
-            {isCopying ? "Copying..." : "Keep demo data"}
+            {isCopying ? "Copying..." : "Keep guest data"}
           </button>
           <button
             onClick={() => setDismissed(true)}

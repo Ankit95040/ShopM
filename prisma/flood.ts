@@ -346,8 +346,8 @@ async function main() {
       const qty = Math.abs(diff);
       const prev = Number(running);
       const next = isAdd ? Number((prev + qty).toFixed(3)) : Number(Math.max(0, prev - qty).toFixed(3));
-      // Ensure adjustment is chronologically last (most recent) so history reconciles — 1 day in future
-      const lastDate = new Date(now + 24 * 60 * 60 * 1000 + randInt(0, 5000));
+      // Ensure adjustment is chronologically last among historical movements but still in the past so new real movements appear on top
+      const lastDate = new Date(now - 60 * 1000 - randInt(0, 5000));
       movementsToCreate.push({
         shopId: shop.id,
         itemId: item.id,

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus, PlusCircle, MinusCircle, Search, ChevronRight } from "lucide-react";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
 import { addStockAction, removeStockAction, createInventoryItemAction } from "@/server/actions/inventory.actions";
@@ -17,6 +18,7 @@ export function CategoryDetailView({
   items: ItemData[];
 }) {
   const toast = useToast();
+  const router = useRouter();
   const [items, setItems] = useState<ItemData[]>(initialItems);
   const [activeItem, setActiveItem] = useState<ItemData | null>(null);
   const [isAddStockOpen, setIsAddStockOpen] = useState(false);
@@ -45,15 +47,22 @@ export function CategoryDetailView({
     const qty = parseFloat(stockQty);
     if (isNaN(qty) || qty <= 0) return;
     setIsSubmitting(true);
-    const res = await addStockAction({ itemId: activeItem.id, quantity: qty, supplier: stockSupplier || undefined, purchasePrice: parseFloat(stockPrice) || undefined, notes: stockNotes || undefined });
-    setIsSubmitting(false);
-    if (res.success && res.result) {
-      const newStock = Number(res.result.item.currentStock);
-      setItems((prev) => prev.map((i) => (i.id === activeItem.id ? { ...i, currentStock: newStock, isLowStock: newStock <= i.minStockThreshold, isOutOfStock: newStock <= 0 } : i)));
-      setIsAddStockOpen(false);
-      setStockQty(""); setStockSupplier(""); setStockPrice(""); setStockNotes("");
-      toast.success("Stock added successfully");
-    } else toast.error(res.error || "Failed to add stock");
+    try {
+      const res = await addStockAction({ itemId: activeItem.id, quantity: qty, supplier: stockSupplier || undefined, purchasePrice: parseFloat(stockPrice) || undefined, notes: stockNotes || undefined });
+      if (res.success && res.result) {
+        const newStock = Number(res.result.item.currentStock);
+        setItems((prev) => prev.map((i) => (i.id === activeItem.id ? { ...i, currentStock: newStock, isLowStock: newStock <= i.minStockThreshold, isOutOfStock: newStock <= 0 } : i)));
+        setIsAddStockOpen(false);
+        setStockQty(""); setStockSupplier(""); setStockPrice(""); setStockNotes("");
+        toast.success("Stock added successfully");
+        router.refresh();
+      } else toast.error(res.error || "Failed to add stock");
+    } catch (err) {
+      console.error("Add stock failed:", err);
+      toast.error("Failed to add stock. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleRemoveStock = async (e: React.FormEvent) => {
@@ -62,52 +71,66 @@ export function CategoryDetailView({
     const qty = parseFloat(stockQty);
     if (isNaN(qty) || qty <= 0) return;
     setIsSubmitting(true);
-    const res = await removeStockAction({ itemId: activeItem.id, quantity: qty, removalReason, notes: stockNotes || undefined });
-    setIsSubmitting(false);
-    if (res.success && res.result) {
-      const newStock = Number(res.result.item.currentStock);
-      setItems((prev) => prev.map((i) => (i.id === activeItem.id ? { ...i, currentStock: newStock, isLowStock: newStock <= i.minStockThreshold, isOutOfStock: newStock <= 0 } : i)));
-      setIsRemoveStockOpen(false);
-      setStockQty(""); setStockNotes("");
-      toast.success("Stock removed successfully");
-    } else toast.error(res.error || "Failed to remove stock");
+    try {
+      const res = await removeStockAction({ itemId: activeItem.id, quantity: qty, removalReason, notes: stockNotes || undefined });
+      if (res.success && res.result) {
+        const newStock = Number(res.result.item.currentStock);
+        setItems((prev) => prev.map((i) => (i.id === activeItem.id ? { ...i, currentStock: newStock, isLowStock: newStock <= i.minStockThreshold, isOutOfStock: newStock <= 0 } : i)));
+        setIsRemoveStockOpen(false);
+        setStockQty(""); setStockNotes("");
+        toast.success("Stock removed successfully");
+        router.refresh();
+      } else toast.error(res.error || "Failed to remove stock");
+    } catch (err) {
+      console.error("Remove stock failed:", err);
+      toast.error("Failed to remove stock. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleCreateItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItemName.trim()) return;
     setIsSubmitting(true);
-    const res = await createInventoryItemAction({
-      name: newItemName,
-      sku: newItemSku || undefined,
-      categoryId: category.id,
-      unit: newItemUnit,
-      minStockThreshold: parseFloat(newItemThreshold) || 5,
-      purchasePrice: parseFloat(newItemPurchasePrice) || undefined,
-      sellingPrice: parseFloat(newItemSellingPrice) || undefined,
-      initialStock: parseFloat(newItemInitialStock) || 0,
-    });
-    setIsSubmitting(false);
-    if (res.success && res.item) {
-      const created: ItemData = {
-        id: res.item.id,
-        name: res.item.name,
-        sku: res.item.sku,
-        unit: res.item.unit,
-        currentStock: parseFloat(newItemInitialStock) || 0,
-        minStockThreshold: parseFloat(newItemThreshold) || 5,
-        purchasePrice: parseFloat(newItemPurchasePrice) || null,
-        sellingPrice: parseFloat(newItemSellingPrice) || null,
-        categoryName: category.name,
+    try {
+      const res = await createInventoryItemAction({
+        name: newItemName,
+        sku: newItemSku || undefined,
         categoryId: category.id,
-        isLowStock: (parseFloat(newItemInitialStock) || 0) <= (parseFloat(newItemThreshold) || 5),
-        isOutOfStock: (parseFloat(newItemInitialStock) || 0) <= 0,
-      };
-      setItems([created, ...items]);
-      setIsAddItemOpen(false);
-      setNewItemName(""); setNewItemSku(""); setNewItemPurchasePrice(""); setNewItemSellingPrice(""); setNewItemInitialStock("0");
-      toast.success("Item added successfully");
-    } else toast.error(res.error || "Failed to create item");
+        unit: newItemUnit,
+        minStockThreshold: parseFloat(newItemThreshold) || 5,
+        purchasePrice: parseFloat(newItemPurchasePrice) || undefined,
+        sellingPrice: parseFloat(newItemSellingPrice) || undefined,
+        initialStock: parseFloat(newItemInitialStock) || 0,
+      });
+      if (res.success && res.item) {
+        const created: ItemData = {
+          id: res.item.id,
+          name: res.item.name,
+          sku: res.item.sku,
+          unit: res.item.unit,
+          currentStock: parseFloat(newItemInitialStock) || 0,
+          minStockThreshold: parseFloat(newItemThreshold) || 5,
+          purchasePrice: parseFloat(newItemPurchasePrice) || null,
+          sellingPrice: parseFloat(newItemSellingPrice) || null,
+          categoryName: category.name,
+          categoryId: category.id,
+          isLowStock: (parseFloat(newItemInitialStock) || 0) <= (parseFloat(newItemThreshold) || 5),
+          isOutOfStock: (parseFloat(newItemInitialStock) || 0) <= 0,
+        };
+        setItems([created, ...items]);
+        setIsAddItemOpen(false);
+        setNewItemName(""); setNewItemSku(""); setNewItemPurchasePrice(""); setNewItemSellingPrice(""); setNewItemInitialStock("0");
+        toast.success("Item added successfully");
+        router.refresh();
+      } else toast.error(res.error || "Failed to create item");
+    } catch (err) {
+      console.error("Create item failed:", err);
+      toast.error("Failed to create item. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

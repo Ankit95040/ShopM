@@ -156,7 +156,7 @@ export function validateImageFile(file: File): string | null {
     return "Invalid file type. Only JPEG, PNG, and WebP images are allowed.";
   }
   if (file.size > MAX_FILE_SIZE) {
-    return `File too large. Maximum size is ${Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB.`;
+    return "Image is too large. Please select an image smaller than 5 MB.";
   }
   return null;
 }

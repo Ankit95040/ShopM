@@ -142,6 +142,7 @@ async function addDebtActionImpl({
     });
 
     revalidatePath(`/billing/${customer.locationId}/customers/${customerId}`);
+    revalidatePath(`/billing/${customer.locationId}/customers/${customerId}/history`);
     revalidatePath(`/billing/${customer.locationId}`);
     revalidatePath("/billing");
     revalidatePath("/");
@@ -212,6 +213,7 @@ async function addPaymentActionImpl({
     });
 
     revalidatePath(`/billing/${customer.locationId}/customers/${customerId}`);
+    revalidatePath(`/billing/${customer.locationId}/customers/${customerId}/history`);
     revalidatePath(`/billing/${customer.locationId}`);
     revalidatePath("/billing");
     revalidatePath("/");
@@ -321,6 +323,7 @@ async function editTransactionActionImpl({
 
     if (cust) {
       revalidatePath(`/billing/${cust.locationId}/customers/${oldTx.customerId}`);
+      revalidatePath(`/billing/${cust.locationId}/customers/${oldTx.customerId}/history`);
       revalidatePath(`/billing/${cust.locationId}`);
     }
     revalidatePath("/billing");
@@ -399,6 +402,7 @@ async function softDeleteTransactionActionImpl({
 
     if (cust) {
       revalidatePath(`/billing/${cust.locationId}/customers/${oldTx.customerId}`);
+      revalidatePath(`/billing/${cust.locationId}/customers/${oldTx.customerId}/history`);
       revalidatePath(`/billing/${cust.locationId}`);
     }
     revalidatePath("/billing");
@@ -511,6 +515,7 @@ async function restoreTransactionActionImpl(transactionId: string) {
 
     if (customer) {
       revalidatePath(`/billing/${customer.locationId}/customers/${tx.customerId}`);
+      revalidatePath(`/billing/${customer.locationId}/customers/${tx.customerId}/history`);
       revalidatePath(`/billing/${customer.locationId}`);
     }
     revalidatePath("/billing");

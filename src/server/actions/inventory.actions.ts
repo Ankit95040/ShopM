@@ -20,6 +20,8 @@ async function createCategoryActionImpl(name: string, description?: string) {
     });
 
     revalidatePath("/inventory");
+    revalidatePath("/inventory/history");
+    revalidatePath(`/inventory/category/${category.id}`);
     revalidatePath("/");
     return { success: true, category };
   } catch (error: unknown) {
@@ -104,6 +106,9 @@ async function createInventoryItemActionImpl({
     });
 
     revalidatePath("/inventory");
+    revalidatePath("/inventory/history");
+    revalidatePath(`/inventory/category/${categoryId}`);
+    revalidatePath(`/inventory/item/${item.id}`);
     revalidatePath("/");
 
     // Return plain serialized object without Decimal
@@ -199,8 +204,16 @@ async function addStockActionImpl({
       };
     });
 
+    // Revalidate all affected inventory views
     revalidatePath("/inventory");
     revalidatePath("/inventory/history");
+    try {
+      const freshItem = await db.inventoryItem.findUnique({ where: { id: itemId }, select: { categoryId: true } });
+      if (freshItem?.categoryId) {
+        revalidatePath(`/inventory/category/${freshItem.categoryId}`);
+      }
+      revalidatePath(`/inventory/item/${itemId}`);
+    } catch {}
     revalidatePath("/");
 
     return { success: true, result };
@@ -277,6 +290,13 @@ async function removeStockActionImpl({
 
     revalidatePath("/inventory");
     revalidatePath("/inventory/history");
+    try {
+      const freshItem = await db.inventoryItem.findUnique({ where: { id: itemId }, select: { categoryId: true } });
+      if (freshItem?.categoryId) {
+        revalidatePath(`/inventory/category/${freshItem.categoryId}`);
+      }
+      revalidatePath(`/inventory/item/${itemId}`);
+    } catch {}
     revalidatePath("/");
 
     return { success: true, result };

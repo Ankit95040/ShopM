@@ -92,8 +92,8 @@ export async function createGuestSessionData(): Promise<{
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + GUEST_TTL_DAYS * 24 * 60 * 60 * 1000);
   const shopCode = `DEMO-${randomBytes(3).toString("hex").toUpperCase()}`;
-  const shopName = "Demo Shop";
-  const guestUserName = "Demo User";
+  const shopName = "Guest Shop";
+  const guestUserName = "Guest User";
   const guestLoginId = `guest_${randomBytes(4).toString("hex")}`;
   const passwordHash = await bcrypt.hash(randomBytes(16).toString("hex"), 12);
 

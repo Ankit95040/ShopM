@@ -37,7 +37,7 @@ export const translations = {
 
     // Greetings & Dashboard
     greetingFallback: "Namaste 🙏",
-    greetingNamed: "Namaste 🙏",
+    greetingNamed: "Namaste, {name} 🙏",
     storeCommandCenter: "Store Command Center",
     dashboardSubtitle: "Quick, reliable Khata bookkeeping & inventory control for daily shop operations",
     module1Badge: "MODULE 1",
@@ -421,7 +421,7 @@ export const translations = {
 
     // Greetings & Dashboard
     greetingFallback: "नमस्ते 🙏",
-    greetingNamed: "नमस्ते 🙏",
+    greetingNamed: "नमस्ते, {name} 🙏",
     storeCommandCenter: "दुकान नियंत्रण केंद्र",
     dashboardSubtitle: "दैनिक दुकान संचालन के लिए तेज़, सुरक्षित खाता बही और स्टॉक प्रबंधन",
     module1Badge: "मॉड्यूल १",

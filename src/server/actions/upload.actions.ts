@@ -10,6 +10,7 @@ import {
   validateImageFile,
 } from "@/lib/s3";
 import { withPerformance } from "@/lib/performance";
+import { revalidatePath } from "next/cache";
 
 export interface UploadResult {
   success: boolean;
@@ -113,6 +114,18 @@ async function uploadBillImageImpl(
     return { success: false, error: "Failed to save bill image reference." };
   }
 
+  // Revalidate affected views so bill image appears without hard refresh
+  try {
+    const cust = await db.customer.findUnique({ where: { id: customerId }, select: { locationId: true } });
+    if (cust) {
+      revalidatePath(`/billing/${cust.locationId}/customers/${customerId}`);
+      revalidatePath(`/billing/${cust.locationId}/customers/${customerId}/history`);
+      revalidatePath(`/billing/${cust.locationId}`);
+    }
+    revalidatePath("/billing");
+    revalidatePath("/reports");
+  } catch {}
+
   return { success: true, billImageKey };
 }
 export const uploadBillImage = withPerformance("uploadBillImage", "action", uploadBillImageImpl);
@@ -173,6 +186,17 @@ async function removeBillImageImpl(params: {
   } catch {
     console.error("[removeBillImage] R2 delete failed (best-effort):", oldKey);
   }
+
+  try {
+    const cust = await db.customer.findUnique({ where: { id: customerId }, select: { locationId: true } });
+    if (cust) {
+      revalidatePath(`/billing/${cust.locationId}/customers/${customerId}`);
+      revalidatePath(`/billing/${cust.locationId}/customers/${customerId}/history`);
+      revalidatePath(`/billing/${cust.locationId}`);
+    }
+    revalidatePath("/billing");
+    revalidatePath("/reports");
+  } catch {}
 
   return { success: true };
 }

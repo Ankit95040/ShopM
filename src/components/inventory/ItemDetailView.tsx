@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus, MinusCircle, History } from "lucide-react";
 import { formatNumber, formatDate } from "@/lib/formatters";
 import { addStockAction, removeStockAction } from "@/server/actions/inventory.actions";
@@ -45,6 +46,7 @@ export function ItemDetailView({
   categoryName: string;
 }) {
   const toast = useToast();
+  const router = useRouter();
   const [item, setItem] = useState(initialItem);
   const [movements, setMovements] = useState<Movement[]>(initialMovements);
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -62,26 +64,33 @@ export function ItemDetailView({
     const q = parseFloat(qty);
     if (isNaN(q) || q <= 0) return;
     setIsSubmitting(true);
-    const res = await addStockAction({ itemId: item.id, quantity: q, supplier: supplier || undefined, purchasePrice: parseFloat(price) || undefined, notes: notes || undefined });
-    setIsSubmitting(false);
-    if (res.success && res.result) {
-      const newStock = Number(res.result.item.currentStock);
-      setItem({ ...item, currentStock: newStock, isLowStock: newStock <= item.minStockThreshold, isOutOfStock: newStock <= 0 });
-      const newMov: Movement = {
-        id: res.result.movement.id,
-        type: "ADD_STOCK",
-        quantity: q,
-        previousStock: Number(res.result.movement.previousStock),
-        newStock,
-        supplier: supplier || null,
-        purchasePrice: parseFloat(price) || null,
-        notes: notes || null,
-        movementDate: new Date(),
-        createdByName: "You",
-      };
-      setMovements([newMov, ...movements]);
-      setIsAddOpen(false); setQty(""); setSupplier(""); setPrice(""); setNotes(""); toast.success("Stock added");
-    } else toast.error(res.error || "Failed to add");
+    try {
+      const res = await addStockAction({ itemId: item.id, quantity: q, supplier: supplier || undefined, purchasePrice: parseFloat(price) || undefined, notes: notes || undefined });
+      if (res.success && res.result) {
+        const newStock = Number(res.result.item.currentStock);
+        setItem({ ...item, currentStock: newStock, isLowStock: newStock <= item.minStockThreshold, isOutOfStock: newStock <= 0 });
+        const newMov: Movement = {
+          id: res.result.movement.id,
+          type: "ADD_STOCK",
+          quantity: q,
+          previousStock: Number(res.result.movement.previousStock),
+          newStock,
+          supplier: supplier || null,
+          purchasePrice: parseFloat(price) || null,
+          notes: notes || null,
+          movementDate: new Date(),
+          createdByName: "You",
+        };
+        setMovements([newMov, ...movements]);
+        setIsAddOpen(false); setQty(""); setSupplier(""); setPrice(""); setNotes(""); toast.success("Stock added");
+        router.refresh();
+      } else toast.error(res.error || "Failed to add");
+    } catch (err) {
+      console.error("Add stock failed:", err);
+      toast.error("Failed to add stock. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleRemove = async (e: React.FormEvent) => {
@@ -89,27 +98,34 @@ export function ItemDetailView({
     const q = parseFloat(qty);
     if (isNaN(q) || q <= 0) return;
     setIsSubmitting(true);
-    const res = await removeStockAction({ itemId: item.id, quantity: q, removalReason, notes: notes || undefined });
-    setIsSubmitting(false);
-    if (res.success && res.result) {
-      const newStock = Number(res.result.item.currentStock);
-      setItem({ ...item, currentStock: newStock, isLowStock: newStock <= item.minStockThreshold, isOutOfStock: newStock <= 0 });
-      const newMov: Movement = {
-        id: res.result.movement.id,
-        type: "REMOVE_STOCK",
-        quantity: q,
-        previousStock: Number(res.result.movement.previousStock),
-        newStock,
-        supplier: null,
-        purchasePrice: null,
-        notes: notes || null,
-        movementDate: new Date(),
-        createdByName: "You",
-        removalReason,
-      };
-      setMovements([newMov, ...movements]);
-      setIsRemoveOpen(false); setQty(""); setNotes(""); toast.success("Stock removed");
-    } else toast.error(res.error || "Failed to remove");
+    try {
+      const res = await removeStockAction({ itemId: item.id, quantity: q, removalReason, notes: notes || undefined });
+      if (res.success && res.result) {
+        const newStock = Number(res.result.item.currentStock);
+        setItem({ ...item, currentStock: newStock, isLowStock: newStock <= item.minStockThreshold, isOutOfStock: newStock <= 0 });
+        const newMov: Movement = {
+          id: res.result.movement.id,
+          type: "REMOVE_STOCK",
+          quantity: q,
+          previousStock: Number(res.result.movement.previousStock),
+          newStock,
+          supplier: null,
+          purchasePrice: null,
+          notes: notes || null,
+          movementDate: new Date(),
+          createdByName: "You",
+          removalReason,
+        };
+        setMovements([newMov, ...movements]);
+        setIsRemoveOpen(false); setQty(""); setNotes(""); toast.success("Stock removed");
+        router.refresh();
+      } else toast.error(res.error || "Failed to remove");
+    } catch (err) {
+      console.error("Remove stock failed:", err);
+      toast.error("Failed to remove stock. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const isLowStock = item.isLowStock;

@@ -26,7 +26,7 @@ function DashboardSkeleton() {
   );
 }
 
-async function DashboardContent({ session }: { session: { shopId: string; userName: string | null } }) {
+async function DashboardContent({ session }: { session: { shopId: string; userName: string | null; isGuest?: boolean } }) {
   let totalItems = 0;
   let lowStockCount = 0;
   let outOfStockCount = 0;
@@ -128,8 +128,9 @@ async function DashboardContent({ session }: { session: { shopId: string; userNa
     console.error("[DashboardPage] Database query error:", error);
   }
 
-  const cleanName = (session.userName ?? "User").replace(/\(.*?\)/g, "").trim();
-  const userGreetingName = cleanName.split(" ")[0] || cleanName;
+  const isGuest = (session as { isGuest?: boolean }).isGuest;
+  const cleanName = isGuest ? "" : (session.userName ?? "User").replace(/\(.*?\)/g, "").trim();
+  const userGreetingName = isGuest ? "" : cleanName.split(" ")[0] || cleanName;
 
   const dashboardData: DashboardMetrics = {
     userGreetingName,

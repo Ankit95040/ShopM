@@ -7,17 +7,17 @@ import { withPerformance } from "@/lib/performance";
 async function copyDemoDataToShopActionImpl() {
   const authSession = await getCurrentSession();
   if (!authSession) {
-    return { success: false, error: "You must be logged in to keep demo data." };
+    return { success: false, error: "You must be logged in to keep guest data." };
   }
   const guestSession = await getGuestSession();
   if (!guestSession || !guestSession.isGuest) {
-    return { success: false, error: "No demo data found to keep." };
+    return { success: false, error: "No guest data found to keep." };
   }
   const demoShopId = guestSession.shopId;
   const targetShopId = authSession.shopId;
 
   if (demoShopId === targetShopId) {
-    return { success: false, error: "Demo shop is the same as your current shop." };
+    return { success: false, error: "Guest shop is the same as your current shop." };
   }
 
   // Verify demo shop is actually a demo shop and belongs to guest
@@ -26,7 +26,7 @@ async function copyDemoDataToShopActionImpl() {
     select: { id: true },
   });
   if (!demoShop) {
-    return { success: false, error: "Demo shop not found or not a demo." };
+    return { success: false, error: "Guest shop not found." };
   }
 
   // Verify target shop belongs to authenticated user and is not demo

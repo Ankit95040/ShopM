@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Pencil, Trash2, FileText, Plus, ArrowDownLeft } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { CustomerAccountData, TransactionItem } from "@/components/billing/CustomerLedgerView";
@@ -14,6 +15,7 @@ import { ImageViewer } from "@/components/shared/ImageViewer";
 
 export function TransactionHistoryView({ data: initialData, locationId }: { data: CustomerAccountData; locationId: string }) {
   const toast = useToast();
+  const router = useRouter();
   const [data, setData] = useState(initialData);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TransactionItem | null>(null);
@@ -56,9 +58,12 @@ export function TransactionHistoryView({ data: initialData, locationId }: { data
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
-    const res = await softDeleteTransactionAction({ transactionId: deleteTarget.id, reason: "Deleted by user" });
-    setIsDeleting(false);
-    if (res.success) {
+    try {
+      const res = await softDeleteTransactionAction({ transactionId: deleteTarget.id, reason: "Deleted by user" });
+      if (!res.success) {
+        toast.error(res.error || "Failed to delete. Please try again.");
+        return;
+      }
       setData((prev) => {
         const isDebt = deleteTarget.type === "DEBT";
         return {
@@ -75,13 +80,19 @@ export function TransactionHistoryView({ data: initialData, locationId }: { data
           allTransactions: prev.allTransactions.filter(t=>t.id!==deleteTarget.id),
         };
       });
+      router.refresh();
       const id = deleteTarget.id;
       toast.undo("Transaction deleted", async () => {
         const r = await restoreTransactionAction(id);
-        if (r.success) window.location.reload();
+        if (r.success) router.refresh();
       });
-    } else toast.error("Failed to delete");
-    setDeleteTarget(null);
+    } catch (err) {
+      console.error("Delete failed:", err);
+      toast.error("Failed to delete. Please try again.");
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
   };
 
   const openEdit = (tx: TransactionItem) => {
@@ -99,24 +110,34 @@ export function TransactionHistoryView({ data: initialData, locationId }: { data
     if (isNaN(amt) || amt<=0) { toast.error("Amount must be greater than zero"); return; }
     if (!editChangeReason.trim()) { toast.error("Change reason required"); return; }
     setIsEditSubmitting(true);
-    const res = await editTransactionAction({ transactionId: editingTx.id, amount: amt, billNumber: editingTx.type==="DEBT"?editBillNo:undefined, paymentMethod: editingTx.type==="PAYMENT_RECEIVED"?editPaymentMethod:undefined, description: editDesc||undefined, changeReason: editChangeReason.trim() });
-    if (!res.success || !res.transaction) { toast.error(res.error||"Failed to edit"); setIsEditSubmitting(false); return; }
-    const updated: TransactionItem = { ...editingTx, amount: amt, billNumber: editingTx.type==="DEBT"?editBillNo||null:editingTx.billNumber, paymentMethod: editingTx.type==="PAYMENT_RECEIVED"?editPaymentMethod:editingTx.paymentMethod, description: editDesc||null };
-    setData(prev=>{
-      const replace=(arr:TransactionItem[])=>arr.map(t=>t.id===editingTx.id?updated:t);
-      const diff = amt - editingTx.amount;
-      const isDebt = editingTx.type==="DEBT";
-      return {
-        ...prev,
-        summary:{ ...prev.summary, totalDebt: isDebt?prev.summary.totalDebt+diff:prev.summary.totalDebt, totalReceived: !isDebt?prev.summary.totalReceived+diff:prev.summary.totalReceived, outstandingBalance: isDebt?prev.summary.outstandingBalance+diff:prev.summary.outstandingBalance-diff },
-        debtTransactions: isDebt?replace(prev.debtTransactions):prev.debtTransactions,
-        paymentTransactions: !isDebt?replace(prev.paymentTransactions):prev.paymentTransactions,
-        allTransactions: replace(prev.allTransactions),
-      };
-    });
-    toast.success("Transaction updated");
-    setEditingTx(null);
-    setIsEditSubmitting(false);
+    try {
+      const res = await editTransactionAction({ transactionId: editingTx.id, amount: amt, billNumber: editingTx.type==="DEBT"?editBillNo:undefined, paymentMethod: editingTx.type==="PAYMENT_RECEIVED"?editPaymentMethod:undefined, description: editDesc||undefined, changeReason: editChangeReason.trim() });
+      if (!res.success || !res.transaction) {
+        toast.error(res.error||"Failed to edit. Please try again.");
+        return;
+      }
+      const updated: TransactionItem = { ...editingTx, amount: amt, billNumber: editingTx.type==="DEBT"?editBillNo||null:editingTx.billNumber, paymentMethod: editingTx.type==="PAYMENT_RECEIVED"?editPaymentMethod:editingTx.paymentMethod, description: editDesc||null };
+      setData(prev=>{
+        const replace=(arr:TransactionItem[])=>arr.map(t=>t.id===editingTx.id?updated:t);
+        const diff = amt - editingTx.amount;
+        const isDebt = editingTx.type==="DEBT";
+        return {
+          ...prev,
+          summary:{ ...prev.summary, totalDebt: isDebt?prev.summary.totalDebt+diff:prev.summary.totalDebt, totalReceived: !isDebt?prev.summary.totalReceived+diff:prev.summary.totalReceived, outstandingBalance: isDebt?prev.summary.outstandingBalance+diff:prev.summary.outstandingBalance-diff },
+          debtTransactions: isDebt?replace(prev.debtTransactions):prev.debtTransactions,
+          paymentTransactions: !isDebt?replace(prev.paymentTransactions):prev.paymentTransactions,
+          allTransactions: replace(prev.allTransactions),
+        };
+      });
+      router.refresh();
+      toast.success("Transaction updated");
+      setEditingTx(null);
+    } catch (err) {
+      console.error("Edit failed:", err);
+      toast.error("Failed to edit. Please try again.");
+    } finally {
+      setIsEditSubmitting(false);
+    }
   };
 
   const handleAddDebt = async (e: React.FormEvent) => {
@@ -124,26 +145,44 @@ export function TransactionHistoryView({ data: initialData, locationId }: { data
     const amt = parseFloat(debtAmount);
     if (isNaN(amt) || amt <= 0) return;
     setIsSubmitting(true);
-    const res = await addDebtAction({ customerId: data.customer.id, amount: amt, billNumber: debtBillNo||undefined, description: debtDesc||undefined, transactionDate: new Date() });
-    if (res.success && res.transaction) {
+    try {
+      const res = await addDebtAction({ customerId: data.customer.id, amount: amt, billNumber: debtBillNo||undefined, description: debtDesc||undefined, transactionDate: new Date() });
+      if (!res.success || !res.transaction) {
+        toast.error(res.error||"Failed to add debt. Please try again.");
+        return;
+      }
       const newTx: TransactionItem = { id: res.transaction.id, type: "DEBT", amount: amt, billNumber: debtBillNo||null, description: debtDesc||null, transactionDate: new Date(), createdByName: "You" };
       setData(prev=>({ ...prev, summary:{...prev.summary, totalDebt: prev.summary.totalDebt+amt, outstandingBalance: prev.summary.outstandingBalance+amt, transactionCount: prev.summary.transactionCount+1}, debtTransactions:[...prev.debtTransactions, newTx], allTransactions:[...prev.allTransactions, newTx]}));
+      router.refresh();
       setIsAddDebtOpen(false); setDebtAmount(""); setDebtBillNo(""); setDebtDesc(""); toast.success("Bill added");
-    } else toast.error(res.error||"Failed to add debt");
-    setIsSubmitting(false);
+    } catch (err) {
+      console.error("Add debt failed:", err);
+      toast.error("Failed to add debt. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     const amt = parseFloat(paymentAmount);
     if (isNaN(amt) || amt<=0) return;
     setIsSubmitting(true);
-    const res = await addPaymentAction({ customerId: data.customer.id, amount: amt, paymentMethod, description: paymentDesc||undefined, transactionDate: new Date() });
-    setIsSubmitting(false);
-    if (res.success && res.transaction) {
+    try {
+      const res = await addPaymentAction({ customerId: data.customer.id, amount: amt, paymentMethod, description: paymentDesc||undefined, transactionDate: new Date() });
+      if (!res.success || !res.transaction) {
+        toast.error(res.error||"Failed to add payment. Please try again.");
+        return;
+      }
       const newTx: TransactionItem = { id: res.transaction.id, type:"PAYMENT_RECEIVED", amount: amt, paymentMethod, description: paymentDesc||null, transactionDate: new Date(), createdByName:"You" };
       setData(prev=>({ ...prev, summary:{...prev.summary, totalReceived: prev.summary.totalReceived+amt, outstandingBalance: prev.summary.outstandingBalance-amt, transactionCount: prev.summary.transactionCount+1}, paymentTransactions:[...prev.paymentTransactions, newTx], allTransactions:[...prev.allTransactions, newTx]}));
+      router.refresh();
       setIsAddPaymentOpen(false); setPaymentAmount(""); setPaymentDesc(""); toast.success("Payment added");
-    } else toast.error(res.error||"Failed to add payment");
+    } catch (err) {
+      console.error("Add payment failed:", err);
+      toast.error("Failed to add payment. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

@@ -207,6 +207,7 @@ interface SerializedTransaction {
   paymentMethod: string | null;
   description: string | null;
   billImageUrl: string | null;
+  billImageKey: string | null;
   transactionDate: Date;
   createdByName: string;
   updatedByName: string | undefined;
@@ -254,6 +255,7 @@ async function getCustomerAccountDetailsActionImpl(customerId: string) {
         paymentMethod: string | null;
         description: string | null;
         billImageUrl: string | null;
+        billImageKey: string | null;
         transactionDate: Date;
         updatedAt: Date;
         createdByName: string;
@@ -261,7 +263,7 @@ async function getCustomerAccountDetailsActionImpl(customerId: string) {
       }[]
     >`
       SELECT t."id", t."type"::text, t."amount", t."billNumber", t."paymentMethod",
-             t."description", t."billImageUrl", t."transactionDate", t."updatedAt",
+             t."description", t."billImageUrl", t."billImageKey", t."transactionDate", t."updatedAt",
              cu."name" AS "createdByName",
              uu."name" AS "updatedByName"
       FROM "Transaction" t
@@ -288,6 +290,7 @@ async function getCustomerAccountDetailsActionImpl(customerId: string) {
         paymentMethod: t.paymentMethod,
         description: t.description,
         billImageUrl: t.billImageUrl,
+        billImageKey: t.billImageKey,
         transactionDate: t.transactionDate,
         createdByName: t.createdByName,
         updatedByName: t.updatedByName ?? undefined,
