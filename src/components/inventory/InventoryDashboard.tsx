@@ -291,31 +291,31 @@ export function InventoryDashboard({
         </div>
       </div>
 
-      {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-          <span className="text-xs font-semibold text-slate-500">{t("totalCatalogItems")}</span>
-          <div className="mt-1 text-2xl font-black text-slate-900">{items.length}</div>
-          <p className="text-[11px] text-slate-400 mt-0.5">
-            {t("acrossCategories", { count: categories.length })}
+      {/* Summary KPI Cards — 3 side-by-side on mobile */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2 sm:p-5 shadow-xs min-w-0 overflow-hidden">
+          <span className="text-[9px] sm:text-xs font-semibold text-slate-500 leading-tight block whitespace-nowrap">Total Items</span>
+          <div className="mt-1 text-sm sm:text-2xl font-black text-slate-900 whitespace-nowrap">{items.length}</div>
+          <p className="text-[9px] sm:text-[11px] text-slate-400 mt-0.5 leading-tight block truncate">
+            <span className="sm:hidden">{categories.length} cats</span><span className="hidden sm:inline">{t("acrossCategories", { count: categories.length })}</span>
           </p>
         </div>
 
-        <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-5 shadow-xs">
-          <span className="text-xs font-bold text-amber-800">{t("lowStockAlert")}</span>
-          <div className="mt-1 text-2xl font-black text-amber-900">{lowStockCount}</div>
-          <p className="text-[11px] text-amber-700 mt-0.5">{t("itemsBelowMin", { count: lowStockCount })}</p>
+        <div className="rounded-xl sm:rounded-2xl border border-amber-200 bg-amber-50/70 p-2 sm:p-5 shadow-xs min-w-0 overflow-hidden">
+          <span className="text-[9px] sm:text-xs font-bold text-amber-800 leading-tight block whitespace-nowrap">Low Stock</span>
+          <div className="mt-1 text-sm sm:text-2xl font-black text-amber-900 whitespace-nowrap">{lowStockCount}</div>
+          <p className="text-[9px] sm:text-[11px] text-amber-700 mt-0.5 leading-tight block truncate">{lowStockCount} low</p>
         </div>
 
-        <div className="rounded-2xl border border-red-200 bg-red-50/70 p-5 shadow-xs">
-          <span className="text-xs font-bold text-red-800">{t("outOfStock")}</span>
-          <div className="mt-1 text-2xl font-black text-red-900">{outOfStockCount}</div>
-          <p className="text-[11px] text-red-600 mt-0.5">{t("needsImmediateRestocking")}</p>
+        <div className="rounded-xl sm:rounded-2xl border border-red-200 bg-red-50/70 p-2 sm:p-5 shadow-xs min-w-0 overflow-hidden">
+          <span className="text-[9px] sm:text-xs font-bold text-red-800 leading-tight block whitespace-nowrap">Out of Stock</span>
+          <div className="mt-1 text-sm sm:text-2xl font-black text-red-900 whitespace-nowrap">{outOfStockCount}</div>
+          <p className="text-[9px] sm:text-[11px] text-red-600 mt-0.5 leading-tight block truncate">Need restock</p>
         </div>
       </div>
 
-      {/* Category Tabs & Search Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-xs">
+      {/* Category Tabs & Search Bar — desktop horizontal (locked) */}
+      <div className="hidden sm:flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-xs">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-2xl">
           <button
             onClick={() => setSelectedCategory("ALL")}
@@ -376,6 +376,36 @@ export function InventoryDashboard({
               className="w-full rounded-xl border border-slate-300 bg-slate-50 py-1.5 pl-8 pr-3 text-xs focus:border-slate-900 focus:bg-white focus:outline-none"
             />
           </div>
+        </div>
+      </div>
+
+      {/* Mobile: Category vertical list */}
+      <div className="flex sm:hidden flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-xs min-w-0">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder={t("searchItemPlaceholder")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-xl border border-slate-300 bg-slate-50 pl-9 pr-3 py-2.5 text-sm focus:border-slate-900 focus:bg-white focus:outline-none min-h-[44px]"
+          />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => setShowLowStockOnly(false)} className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-bold transition min-h-[44px] ${!showLowStockOnly ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600"}`}>{t("all")} ({items.length})</button>
+          <button onClick={() => setShowLowStockOnly(true)} className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-bold transition min-h-[44px] ${showLowStockOnly ? "bg-amber-500 text-white shadow-xs" : "bg-slate-100 text-slate-600"}`}>{t("lowStockOnlyFilter")}</button>
+        </div>
+        <div className="space-y-1.5">
+          <button type="button" onClick={() => setSelectedCategory("ALL")} className={`w-full text-left flex items-center justify-between rounded-xl px-4 py-3 text-sm font-bold transition min-h-[44px] border cursor-pointer touch-manipulation ${selectedCategory==="ALL" ? "bg-slate-900 text-white border-slate-900 shadow-xs" : "bg-slate-50 text-slate-700 border-slate-200 active:bg-slate-100 hover:bg-slate-100"}`}>
+            <span>{t("allItemsTab", { count: items.length })}</span>
+            <span className={`text-xs ${selectedCategory==="ALL"?"text-sky-300":"text-slate-400"}`}>→</span>
+          </button>
+          {categories.map((cat) => (
+            <Link key={cat.id} href={`/inventory/category/${cat.id}`} className="w-full text-left flex items-center justify-between rounded-xl px-4 py-3 text-sm font-bold transition min-h-[44px] border bg-white text-slate-700 border-slate-200 active:bg-slate-50 hover:bg-slate-50 cursor-pointer touch-manipulation">
+              <span className="truncate min-w-0 flex-1 pointer-events-none">{cat.name}</span>
+              <span className="ml-2 text-xs shrink-0 pointer-events-none text-slate-400">→</span>
+            </Link>
+          ))}
         </div>
       </div>
 
