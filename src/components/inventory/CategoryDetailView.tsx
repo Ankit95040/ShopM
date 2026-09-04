@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, PlusCircle, MinusCircle, Search, ChevronRight, ChevronDown, Loader2, History } from "lucide-react";
-import { formatCurrency, formatDate, formatNumber } from "@/lib/formatters";
-import { addStockAction, removeStockAction, createInventoryItemAction, getStockMovementsAction } from "@/server/actions/inventory.actions";
+import { ArrowLeft, Plus, PlusCircle, MinusCircle, Search, ChevronRight } from "lucide-react";
+import { formatCurrency, formatNumber } from "@/lib/formatters";
+import { addStockAction, removeStockAction, createInventoryItemAction } from "@/server/actions/inventory.actions";
 import { StockRemovalReason } from "@prisma/client";
 import { useToast } from "@/components/shared/ToastContext";
 import type { ItemData } from "@/components/inventory/InventoryDashboard";
@@ -36,44 +36,8 @@ export function CategoryDetailView({
   const [newItemInitialStock, setNewItemInitialStock] = useState("0");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [search, setSearch] = useState("");
-  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
-  const [movementsByItem, setMovementsByItem] = useState<Record<string, Array<{ id: string; type: string; quantity: number; movementDate: Date | string; createdByName?: string }>>>({});
-  const [loadingHistoryId, setLoadingHistoryId] = useState<string | null>(null);
-  const [historyExpanded, setHistoryExpanded] = useState(false);
 
   const filteredItems = items.filter((it) => it.name.toLowerCase().includes(search.toLowerCase()));
-  // Collapse expanded if it no longer matches search
-  useEffect(() => {
-    if (expandedItemId && !filteredItems.some((it) => it.id === expandedItemId)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- collapse on filter change is intentional
-      setExpandedItemId(null);
-    }
-  }, [search, filteredItems, expandedItemId]);
-
-  useEffect(() => {
-    // Reset history view when switching items
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset is intentional on item change
-    setHistoryExpanded(false);
-  }, [expandedItemId]);
-
-  const handleToggleItem = async (item: ItemData) => {
-    if (expandedItemId === item.id) {
-      setExpandedItemId(null);
-      return;
-    }
-    setExpandedItemId(item.id);
-    setHistoryExpanded(false);
-    if (!movementsByItem[item.id] && loadingHistoryId !== item.id) {
-      setLoadingHistoryId(item.id);
-      try {
-        const res = await getStockMovementsAction(item.id);
-        if (res.success && res.movements) {
-          setMovementsByItem((prev) => ({ ...prev, [item.id]: res.movements as unknown as Array<{ id: string; type: string; quantity: number; movementDate: Date | string; createdByName?: string }> }));
-        }
-      } catch {}
-      setLoadingHistoryId(null);
-    }
-  };
 
   const handleAddStock = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,86 +156,29 @@ export function CategoryDetailView({
         </div>
       ) : (
         <>
-          {/* Mobile: simple rows with accordion */}
+          {/* Mobile: compact rows — tap to open item details */}
           <div className="sm:hidden rounded-2xl border border-slate-200 bg-white overflow-hidden divide-y divide-slate-100">
-            {filteredItems.map((item) => {
-              const isExpanded = expandedItemId === item.id;
-              const history = movementsByItem[item.id];
-              const isLoading = loadingHistoryId === item.id;
-              return (
-                <div key={item.id} className="min-w-0">
-                  <button
-                    type="button"
-                    onClick={() => handleToggleItem(item)}
-                    className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left min-h-[48px] active:bg-slate-50 transition"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-bold text-slate-900 truncate">{item.name}</div>
-                      <div className="text-xs text-slate-500 truncate">
-                        {item.currentStock} {item.unit} • {item.isOutOfStock ? "Out of Stock" : item.isLowStock ? "Low Stock" : "In Stock"}
-                      </div>
-                    </div>
-                    {isExpanded ? <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" /> : <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />}
-                  </button>
-                  {isExpanded && (
-                    <div className="px-4 pb-4 pt-2 bg-slate-50/50 border-t border-slate-100 space-y-3">
-                      <div className="grid grid-cols-2 gap-3 text-center">
-                        <div className="rounded-xl bg-white border border-slate-200 p-3">
-                          <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Stock</div>
-                          <div className="text-sm font-black text-slate-900">{formatNumber(item.currentStock, 1)} {item.unit}</div>
-                          <div className="text-[10px] text-slate-400">Min {item.minStockThreshold}</div>
-                        </div>
-                        <div className="rounded-xl bg-white border border-slate-200 p-3">
-                          <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Price</div>
-                          <div className="text-sm font-black text-slate-900 whitespace-nowrap">{item.sellingPrice ? formatCurrency(item.sellingPrice) : "-"}</div>
-                        </div>
-                      </div>
-                      {/* History — billing-style line-by-line */}
-                      <div>
-                        <div className="flex items-center gap-1.5 text-xs font-black tracking-wide text-slate-800 uppercase mb-1"><History className="h-3.5 w-3.5 text-slate-500" /> History</div>
-                        {isLoading ? (
-                          <div className="flex items-center justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
-                        ) : history && history.length > 0 ? (
-                          <>
-                            <div className={historyExpanded ? "divide-y divide-slate-100 border border-slate-200 rounded-xl bg-white max-h-[216px] overflow-y-auto" : "divide-y divide-slate-100 border border-slate-200 rounded-xl bg-white"}>
-                              {(historyExpanded ? history : history.slice(0, 3)).map((m) => {
-                                const isAdd = m.type === "ADD_STOCK";
-                                return (
-                                  <div key={m.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                                    <div className="min-w-0 flex-1">
-                                      <div className={`text-sm font-black leading-none ${isAdd ? "text-emerald-600" : "text-red-600"}`}>
-                                        {isAdd ? `+${m.quantity}` : `-${m.quantity}`} <span className="text-xs font-bold text-slate-700">{isAdd ? "Added" : "Removed"}</span>
-                                      </div>
-                                      <div className="text-[11px] text-slate-500 truncate mt-0.5">
-                                        {m.createdByName || "Unknown"} • {formatDate(m.movementDate as unknown as string, "dd MMM, hh:mm a")}
-                                      </div>
-                                    </div>
-                                    <div className={`text-sm font-black whitespace-nowrap ml-2 ${isAdd ? "text-emerald-600" : "text-red-600"}`}>
-                                      {isAdd ? `+${m.quantity}` : `-${m.quantity}`}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            {history.length > 3 && (
-                              <button type="button" onClick={() => setHistoryExpanded(!historyExpanded)} className="w-full mt-2 inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition min-h-[36px]">
-                                {historyExpanded ? "Show less ↑" : `View all transactions ↓`}
-                              </button>
-                            )}
-                          </>
-                        ) : (
-                          <p className="text-xs text-slate-400 py-3 text-center border border-dashed border-slate-200 rounded-xl bg-white">No stock history yet</p>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => { setActiveItem(item); setIsAddStockOpen(true); }} className="flex-1 inline-flex min-h-[44px] items-center justify-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-800"><PlusCircle className="h-4 w-4" /> + Add</button>
-                        <button onClick={() => { setActiveItem(item); setIsRemoveStockOpen(true); }} className="flex-1 inline-flex min-h-[44px] items-center justify-center gap-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"><MinusCircle className="h-4 w-4" /> − Remove</button>
-                      </div>
-                    </div>
-                  )}
+            {filteredItems.map((item) => (
+              <Link
+                key={item.id}
+                href={`/inventory/item/${item.id}`}
+                className="flex items-center gap-3 px-4 py-3 min-h-[52px] hover:bg-slate-50 active:bg-slate-100 transition"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100">
+                  <span className="text-sm">📦</span>
                 </div>
-              );
-            })}
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-bold text-slate-900 truncate">{item.name}</div>
+                  <div className="text-xs text-slate-500 truncate">
+                    {formatNumber(item.currentStock, 1)} {item.unit} • {item.isOutOfStock ? "Out of Stock" : item.isLowStock ? "Low Stock" : "In Stock"}
+                  </div>
+                </div>
+                <span className={`hidden sm:inline-flex shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${item.isOutOfStock ? "bg-red-100 text-red-800" : item.isLowStock ? "bg-amber-100 text-amber-900" : "bg-emerald-100 text-emerald-800"}`}>
+                  {item.isOutOfStock ? "Out" : item.isLowStock ? "Low" : "In Stock"}
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+              </Link>
+            ))}
           </div>
 
           {/* Desktop: large cards (locked) */}
@@ -319,30 +226,30 @@ export function CategoryDetailView({
             <form onSubmit={handleCreateItem} className="mt-4 space-y-3.5">
               <div>
                 <label className="text-xs font-bold text-slate-700">Item Name *</label>
-                <input type="text" required placeholder="e.g. Milk 500ml" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs focus:border-slate-900 focus:outline-none" />
+                <input type="text" required placeholder="e.g. Milk 500ml" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-2 text-base sm:text-xs focus:border-slate-900 focus:outline-none" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-700">Unit</label>
-                  <input type="text" value={newItemUnit} onChange={(e) => setNewItemUnit(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-slate-900 focus:outline-none" />
+                  <input type="text" value={newItemUnit} onChange={(e) => setNewItemUnit(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-base sm:text-xs focus:border-slate-900 focus:outline-none" />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-700">Min Threshold</label>
-                  <input type="number" value={newItemThreshold} onChange={(e) => setNewItemThreshold(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold focus:border-slate-900 focus:outline-none" />
+                  <input type="number" value={newItemThreshold} onChange={(e) => setNewItemThreshold(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-base sm:text-xs font-bold focus:border-slate-900 focus:outline-none" />
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-700">Purchase Price</label>
-                  <input type="number" step="0.01" placeholder="0.00" value={newItemPurchasePrice} onChange={(e) => setNewItemPurchasePrice(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-slate-900 focus:outline-none" />
+                  <input type="number" step="0.01" placeholder="0.00" value={newItemPurchasePrice} onChange={(e) => setNewItemPurchasePrice(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-base sm:text-xs focus:border-slate-900 focus:outline-none" />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-700">Selling Price</label>
-                  <input type="number" step="0.01" placeholder="0.00" value={newItemSellingPrice} onChange={(e) => setNewItemSellingPrice(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-emerald-700 focus:border-slate-900 focus:outline-none" />
+                  <input type="number" step="0.01" placeholder="0.00" value={newItemSellingPrice} onChange={(e) => setNewItemSellingPrice(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-base sm:text-xs font-bold text-emerald-700 focus:border-slate-900 focus:outline-none" />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-700">Initial Stock</label>
-                  <input type="number" placeholder="0" value={newItemInitialStock} onChange={(e) => setNewItemInitialStock(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold focus:border-slate-900 focus:outline-none" />
+                  <input type="number" placeholder="0" value={newItemInitialStock} onChange={(e) => setNewItemInitialStock(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-base sm:text-xs font-bold focus:border-slate-900 focus:outline-none" />
                 </div>
               </div>
               <div className="flex gap-2 pt-3">
@@ -367,7 +274,7 @@ export function CategoryDetailView({
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-700">Supplier</label>
-                <input type="text" placeholder="Supplier" value={stockSupplier} onChange={(e) => setStockSupplier(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs focus:border-slate-900 focus:outline-none" />
+                <input type="text" placeholder="Supplier" value={stockSupplier} onChange={(e) => setStockSupplier(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-2 text-base sm:text-xs focus:border-slate-900 focus:outline-none" />
               </div>
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setIsAddStockOpen(false)} className="w-1/3 rounded-xl border border-slate-300 py-2.5 text-xs font-semibold hover:bg-slate-50">Cancel</button>
@@ -391,7 +298,7 @@ export function CategoryDetailView({
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-700">Reason *</label>
-                <select value={removalReason} onChange={(e) => setRemovalReason(e.target.value as StockRemovalReason)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-bold focus:border-slate-900 focus:outline-none">
+                <select value={removalReason} onChange={(e) => setRemovalReason(e.target.value as StockRemovalReason)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-base sm:text-xs font-bold focus:border-slate-900 focus:outline-none">
                   <option value={StockRemovalReason.SOLD}>Sold</option>
                   <option value={StockRemovalReason.DAMAGED}>Damaged</option>
                   <option value={StockRemovalReason.LOST}>Lost</option>

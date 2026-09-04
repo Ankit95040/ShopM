@@ -187,7 +187,7 @@ export function ForgotPasswordWizard() {
                     autoComplete="organization"
                     required
                     placeholder="e.g. SHARMA-STORE"
-                    className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]"
+                    className="w-full bg-transparent text-base sm:text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]"
                   />
                 </div>
               </label>
@@ -239,7 +239,7 @@ export function ForgotPasswordWizard() {
                     autoComplete="username"
                     required
                     placeholder="e.g. rahul"
-                    className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]"
+                    className="w-full bg-transparent text-base sm:text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]"
                   />
                 </div>
               </label>
@@ -346,7 +346,7 @@ export function ForgotPasswordWizard() {
                     autoComplete="one-time-code"
                     placeholder="000000"
                     required
-                    className="w-full bg-transparent text-sm font-black text-slate-900 outline-none tracking-[0.3em] font-mono min-h-[44px]"
+                    className="w-full bg-transparent text-base sm:text-sm font-black text-slate-900 outline-none tracking-[0.3em] font-mono min-h-[44px]"
                   />
                 </div>
               </label>
@@ -413,7 +413,7 @@ export function ForgotPasswordWizard() {
                     autoComplete="new-password"
                     minLength={6}
                     required
-                    className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]"
+                    className="w-full bg-transparent text-base sm:text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]"
                     placeholder="Min. 6 characters"
                   />
                   <button
@@ -437,7 +437,7 @@ export function ForgotPasswordWizard() {
                     autoComplete="new-password"
                     minLength={6}
                     required
-                    className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]"
+                    className="w-full bg-transparent text-base sm:text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]"
                     placeholder="Re-enter password"
                   />
                   <button

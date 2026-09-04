@@ -123,6 +123,10 @@ export function CustomerLedgerView({
   const [deleteTxTarget, setDeleteTxTarget] = useState<TransactionItem | null>(null);
   const [isDeletingTx, setIsDeletingTx] = useState(false);
 
+  // Mobile unified transaction filter
+  const [mobileTxFilter, setMobileTxFilter] = useState<"ALL" | "DEBT" | "PAYMENT_RECEIVED">("ALL");
+  const [mobileTxVisible, setMobileTxVisible] = useState(10);
+
   // Period selector
   const [selectedPeriod, setSelectedPeriod] = useState<string>("all");
 
@@ -629,7 +633,7 @@ export function CustomerLedgerView({
   };
 
   return (
-    <div className="space-y-6 min-w-0 pb-24 sm:pb-0">
+    <div className="space-y-8 sm:space-y-6 min-w-0 pb-24 sm:pb-0">
       {/* Breadcrumb & Navigation */}
       <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -648,6 +652,13 @@ export function CustomerLedgerView({
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 sm:text-3xl flex items-center gap-2 break-words min-w-0">
               <span className="break-words min-w-0">{customer.name}</span>
             </h1>
+            {/* Mobile outstanding directly below name — subtle bg, RED debt / GREEN advance */}
+            <div className={`sm:hidden mt-1 inline-flex items-baseline gap-1.5 min-w-0 rounded-lg px-2.5 py-1 ${summary.outstandingBalance < 0 ? "bg-emerald-50/60" : summary.outstandingBalance === 0 ? "bg-slate-50" : "bg-red-50/60"}`}>
+              <span className={`text-[15px] font-black whitespace-nowrap leading-none ${summary.outstandingBalance < 0 ? "text-emerald-600" : summary.outstandingBalance === 0 ? "text-slate-500" : "text-red-600"}`}>
+                {formatCurrency(Math.abs(summary.outstandingBalance))}
+              </span>
+              <span className={`text-xs font-bold leading-none ${summary.outstandingBalance < 0 ? "text-emerald-600" : summary.outstandingBalance === 0 ? "text-slate-500" : "text-red-600"}`}>outstanding</span>
+            </div>
           </div>
         </div>
 
@@ -701,8 +712,8 @@ export function CustomerLedgerView({
         </div>
       </div>
 
-      {/* CUSTOMER ACCOUNT SUMMARY CARD */}
-      <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm min-w-0 overflow-hidden">
+      {/* CUSTOMER ACCOUNT SUMMARY CARD — mobile borderless */}
+      <div className="sm:rounded-3xl sm:border sm:border-slate-200 sm:bg-white sm:p-6 sm:shadow-sm min-w-0 overflow-hidden bg-transparent border-0 p-0 shadow-none">
         <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-4">
           {/* Customer Meta */}
           <div className="space-y-1 min-w-0 flex-1">
@@ -744,31 +755,22 @@ export function CustomerLedgerView({
           </div>
         </div>
 
-        {/* Mobile: Single compact Account Summary — 3 columns side-by-side */}
-        <div className="sm:hidden mt-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-xs min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-3">
+        {/* Mobile: Account Summary — borderless, accent heading — RED debt / GREEN received */}
+        <div className="sm:hidden mt-8 min-w-0">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="h-4 w-1 rounded-full bg-slate-900"></div>
             <h3 className="text-sm font-black text-slate-900">Account Summary</h3>
-            <span className="text-[11px] font-medium text-slate-400 whitespace-nowrap">
-              {debtTransactions.length} bill{debtTransactions.length !== 1 ? "s" : ""} • {paymentTransactions.length} payment{paymentTransactions.length !== 1 ? "s" : ""}
-            </span>
           </div>
-          <div className="grid grid-cols-3 gap-1.5">
-            <div className="rounded-xl bg-red-50 border border-red-100 p-2 text-center min-w-0">
-              <div className="text-[9px] font-bold uppercase tracking-wide text-red-700 leading-tight whitespace-nowrap">Total Debt</div>
-              <div className="mt-1 text-[12px] min-[360px]:text-xs min-[400px]:text-sm font-black text-red-600 whitespace-nowrap leading-tight">{formatCurrency(summary.totalDebt)}</div>
-              <div className="mt-1 text-[10px] text-slate-400 truncate">{debtTransactions.length} bill{debtTransactions.length !== 1 ? "s" : ""}</div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-red-50/60 p-3 text-center min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-wide text-red-600 leading-tight">Total Debt</div>
+              <div className="mt-1.5 text-base font-black text-red-600 whitespace-nowrap leading-tight">{formatCurrency(summary.totalDebt)}</div>
+              <div className="mt-1 text-[11px] text-slate-500">{debtTransactions.length} bills</div>
             </div>
-            <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-2 text-center min-w-0">
-              <div className="text-[9px] font-bold uppercase tracking-wide text-emerald-700 leading-tight whitespace-nowrap">Received</div>
-              <div className="mt-1 text-[12px] min-[360px]:text-xs min-[400px]:text-sm font-black text-emerald-600 whitespace-nowrap leading-tight">{formatCurrency(summary.totalReceived)}</div>
-              <div className="mt-1 text-[10px] text-slate-400 truncate">{paymentTransactions.length} payment{paymentTransactions.length !== 1 ? "s" : ""}</div>
-            </div>
-            <div className={`rounded-xl p-2 text-center min-w-0 border ${isAdvance ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
-              <div className={`text-[9px] font-bold uppercase tracking-wide leading-tight whitespace-nowrap ${isAdvance ? "text-emerald-700" : "text-amber-700"}`}>Outstanding</div>
-              <div className={`mt-1 text-[12px] min-[360px]:text-xs min-[400px]:text-sm font-black whitespace-nowrap leading-tight ${isAdvance ? "text-emerald-700" : "text-amber-700"}`}>
-                {isAdvance ? formatCurrency(Math.abs(summary.outstandingBalance)) : formatCurrency(summary.outstandingBalance)}
-              </div>
-              <div className="mt-1 text-[10px] text-slate-400">{isAdvance ? "advance" : "due"}</div>
+            <div className="rounded-xl bg-emerald-50/40 p-3 text-center min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 leading-tight">Received</div>
+              <div className="mt-1.5 text-base font-black text-emerald-700 whitespace-nowrap leading-tight">{formatCurrency(summary.totalReceived)}</div>
+              <div className="mt-1 text-[11px] text-slate-500">{paymentTransactions.length} payments</div>
             </div>
           </div>
         </div>
@@ -809,8 +811,11 @@ export function CustomerLedgerView({
         </div>
       </div>
 
-      {/* TWO SEPARATED VISUAL SECTIONS (LEFT: DEBT | RIGHT: PAYMENT RECEIVED) */}
-      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2 min-w-0">
+      {/* Mobile subtle divider — separates Account Summary from Transactions */}
+      <div className="sm:hidden h-px bg-slate-200/70"></div>
+
+      {/* Desktop: TWO SEPARATED VISUAL SECTIONS (LEFT: DEBT | RIGHT: PAYMENT RECEIVED) — locked */}
+      <div className="hidden sm:grid sm:gap-6 lg:grid-cols-2 min-w-0">
         {/* LEFT COLUMN: DEBT (BILLS & CREDIT PURCHASES) */}
         <div className="rounded-2xl sm:rounded-3xl border border-red-100 bg-white shadow-xs overflow-hidden min-w-0">
           <div className="bg-red-50/80 px-4 sm:px-6 py-4 border-b border-red-100 flex items-center justify-between gap-2 min-w-0">
@@ -1007,6 +1012,90 @@ export function CustomerLedgerView({
             )}
           </div>
         </div>
+      </div>
+
+      {/* Mobile unified Transactions — borderless ledger */}
+      <div className="sm:hidden space-y-4">
+        <div className="flex items-center gap-2">
+          <div className="h-4 w-1 rounded-full bg-slate-900"></div>
+          <h3 className="text-sm font-black text-slate-900">Transactions</h3>
+          <span className="ml-auto text-xs font-bold text-slate-400">
+            {(() => {
+              const all = displayTxs.length;
+              if (mobileTxFilter === "ALL") return `${all}`;
+              if (mobileTxFilter === "DEBT") return `${displayTxs.filter((t) => t.type === "DEBT").length}`;
+              return `${displayTxs.filter((t) => t.type === "PAYMENT_RECEIVED").length}`;
+            })()}
+          </span>
+        </div>
+
+        {/* Segmented filter */}
+        <div className="flex rounded-xl bg-slate-100 p-1 gap-1">
+          {([
+            ["ALL", "All"],
+            ["DEBT", "Debt"],
+            ["PAYMENT_RECEIVED", "Received"],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => {
+                setMobileTxFilter(value);
+                setMobileTxVisible(10);
+              }}
+              className={`flex-1 min-h-[44px] rounded-lg px-3 py-2 text-xs font-bold transition ${
+                mobileTxFilter === value ? "bg-slate-900 text-white shadow-xs" : "text-slate-600 hover:bg-white"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Transaction list — clean vertical ledger */}
+        {(() => {
+          const filtered = mobileTxFilter === "ALL" ? displayTxs : displayTxs.filter((t) => t.type === mobileTxFilter);
+          const visible = filtered.slice(0, mobileTxVisible);
+          if (filtered.length === 0) {
+            return <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-xs text-slate-500">No transactions</div>;
+          }
+          return (
+            <>
+              <div className="divide-y divide-slate-100">
+                {visible.map((txItem) => {
+                  const isDebt = txItem.type === "DEBT";
+                  return (
+                    <div key={txItem.id} className="px-4 py-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className={`text-sm font-black whitespace-nowrap ${isDebt ? "text-red-600" : "text-emerald-600"}`}>
+                          {isDebt ? "" : "+ "}{formatCurrency(txItem.amount)}
+                        </div>
+                        <div className="text-xs font-semibold text-slate-700 truncate">
+                          {isDebt ? (txItem.description || `Bill ${txItem.billNumber || ""}`.trim() || "Bill") : txItem.description ? txItem.description : `Payment received${txItem.paymentMethod ? ` • ${txItem.paymentMethod}` : ""}`}
+                        </div>
+                        <div className="text-[11px] text-slate-500 truncate">
+                          {txItem.createdByName} • {formatDate(txItem.transactionDate, "dd MMM • hh:mm a")}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => openEditModal(txItem)} className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Edit">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={() => setDeleteTxTarget(txItem)} className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-300 hover:bg-red-50 hover:text-red-600" aria-label="Delete">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {filtered.length > visible.length && (
+                <button onClick={() => setMobileTxVisible((v) => v + 10)} className="w-full mt-3 inline-flex min-h-[44px] items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                  View all transactions ↓
+                </button>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       {/* Mobile floating action bar — Add Debt + Add Payment (phone only) */}

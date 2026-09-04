@@ -3,7 +3,7 @@
 import { withPerformance } from "@/lib/performance";
 import { db } from "@/server/db";
 import { requireAuth } from "@/server/auth";
-import { StockMovementType, StockRemovalReason, Prisma } from "@prisma/client";
+import { StockMovementType, StockRemovalReason, Prisma, AuditAction } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 async function createCategoryActionImpl(name: string, description?: string) {
@@ -432,3 +432,66 @@ async function getAllMovementsActionImpl() {
   }
 }
 export const getAllMovementsAction = withPerformance("getAllMovementsAction", "action", getAllMovementsActionImpl);
+
+async function getDeletedInventoryItemsActionImpl() {
+  try {
+    const session = await requireAuth();
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const deletedItems = await db.inventoryItem.findMany({
+      where: { shopId: session.shopId, isDeleted: true, deletedAt: { not: null, gte: thirtyDaysAgo } },
+      include: { category: { select: { name: true } } },
+      orderBy: { deletedAt: "desc" },
+    });
+    const formatted = deletedItems.map((item) => {
+      const deletedAt = item.deletedAt || item.createdAt;
+      const expiresAt = new Date(deletedAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const daysRemaining = Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+      return {
+        id: item.id,
+        name: item.name,
+        categoryName: item.category.name,
+        unit: item.unit,
+        deletedAt,
+        expiresAt,
+        daysRemaining,
+      };
+    });
+    return { success: true, items: formatted };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch deleted items" };
+  }
+}
+export const getDeletedInventoryItemsAction = withPerformance("getDeletedInventoryItemsAction", "action", getDeletedInventoryItemsActionImpl);
+
+async function restoreInventoryItemActionImpl(itemId: string) {
+  try {
+    const session = await requireAuth();
+    const item = await db.inventoryItem.findFirst({
+      where: { id: itemId, shopId: session.shopId, isDeleted: true },
+      select: { id: true, name: true },
+    });
+    if (!item) return { success: false, error: "Item not found or not deleted" };
+    await db.$transaction(async (prisma) => {
+      await prisma.inventoryItem.update({ where: { id: itemId }, data: { isDeleted: false, deletedAt: null } });
+      await prisma.auditLog.create({
+        data: {
+          shopId: session.shopId,
+          userId: session.userId,
+          action: AuditAction.RESTORE,
+          entityType: "INVENTORY",
+          entityId: itemId,
+          previousValue: { isDeleted: true },
+          newValue: { isDeleted: false },
+          changeReason: "Inventory item restored by user",
+        },
+      });
+    });
+    revalidatePath("/inventory");
+    revalidatePath("/recycle-bin");
+    revalidatePath("/");
+    return { success: true };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to restore item" };
+  }
+}
+export const restoreInventoryItemAction = withPerformance("restoreInventoryItemAction", "action", restoreInventoryItemActionImpl);

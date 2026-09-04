@@ -166,8 +166,8 @@ export function AccountDetailsModal({ isOpen, onClose }: AccountDetailsModalProp
         aria-labelledby="account-details-title"
         className="w-full max-w-lg bg-white rounded-2xl shadow-2xl flex flex-col max-h-[calc(100dvh-32px)]"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+        {/* Header — mobile compact */}
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-2" id="account-details-title">
             <User className="h-5 w-5 text-sky-600" />
             <h2 className="text-base font-black text-slate-900">{t("accountDetails")}</h2>
@@ -182,8 +182,8 @@ export function AccountDetailsModal({ isOpen, onClose }: AccountDetailsModalProp
           </button>
         </div>
 
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        {/* Scrollable body — mobile compact */}
+        <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-4 space-y-4">
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <div className="h-6 w-6 border-2 border-slate-300 border-t-sky-600 rounded-full animate-spin" />
@@ -191,8 +191,21 @@ export function AccountDetailsModal({ isOpen, onClose }: AccountDetailsModalProp
             </div>
           ) : details ? (
             <>
-              {/* SHOP DETAILS */}
-              <div>
+              {/* SHOP DETAILS — mobile simple, desktop unchanged */}
+              <div className="block sm:hidden space-y-3">
+                <div>
+                  <p className="text-[11px] text-slate-500">{t("shopName")}</p>
+                  <p className="text-sm font-bold text-slate-900 break-words">{details.shopName}</p>
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] text-slate-500">{t("shopId")}</p>
+                    <p className="text-sm font-bold text-slate-900 font-mono tracking-wider break-all">{details.shopCode}</p>
+                  </div>
+                  <CopyButton text={details.shopCode} label={t("copyShopId")} />
+                </div>
+              </div>
+              <div className="hidden sm:block">
                 <div className="flex items-center gap-2 mb-2">
                   <Store className="h-4 w-4 text-slate-600" />
                   <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">{t("shopDetails")}</h3>
@@ -201,8 +214,8 @@ export function AccountDetailsModal({ isOpen, onClose }: AccountDetailsModalProp
                 <p className="text-sm font-bold text-slate-900">{details.shopName}</p>
               </div>
 
-              {/* SHOP ID — prominent */}
-              <div className="rounded-xl border-2 border-sky-200 bg-sky-50 p-4">
+              {/* SHOP ID — mobile subtle, desktop prominent */}
+              <div className="hidden sm:block rounded-xl border-2 border-sky-200 bg-sky-50 p-4">
                 <p className="text-[11px] font-bold text-sky-600 uppercase tracking-wider mb-1">{t("shopId")}</p>
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-xl font-black text-sky-800 font-mono tracking-wider break-all">{details.shopCode}</p>
@@ -217,11 +230,54 @@ export function AccountDetailsModal({ isOpen, onClose }: AccountDetailsModalProp
                 </div>
               </div>
 
-              {/* Divider */}
-              <div className="border-t border-slate-200" />
+              {/* Divider — subtle on mobile */}
+              <div className="border-t border-slate-100 sm:border-slate-200" />
 
-              {/* MY ACCOUNT */}
-              <div>
+              {/* MY ACCOUNT — mobile simple (no Role), desktop unchanged */}
+              <div className="block sm:hidden">
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3">{t("currentAccount")}</h3>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-[11px] text-slate-500">{t("name")}</p>
+                    <p className="text-sm font-bold text-slate-900 break-words flex items-center gap-1.5">
+                      <User className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <span className="break-words">{details.userName}</span>
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] text-slate-500">{t("loginIdLabel")}</p>
+                      <p className="text-sm font-bold text-slate-900 font-mono break-all">{details.loginId}</p>
+                    </div>
+                    <CopyButton text={details.loginId} label={t("copyLoginId")} />
+                  </div>
+                  {details.email && (
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] text-slate-500">{t("email")}</p>
+                        <p className="text-sm font-bold text-slate-900 break-all flex items-center gap-1.5">
+                          <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          <span className="break-all">{details.email}</span>
+                        </p>
+                      </div>
+                      <CopyButton text={details.email} label={t("copyEmail")} />
+                    </div>
+                  )}
+                  {details.phone && (
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] text-slate-500">{t("phone")}</p>
+                        <p className="text-sm font-bold text-slate-900 break-all flex items-center gap-1.5">
+                          <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          <span className="break-all">{details.phone}</span>
+                        </p>
+                      </div>
+                      <CopyButton text={details.phone} label={t("copyPhone")} />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="hidden sm:block">
                 <div className="flex items-center gap-2 mb-2">
                   <Shield className="h-4 w-4 text-slate-600" />
                   <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">{t("currentAccount")}</h3>
@@ -299,9 +355,9 @@ export function AccountDetailsModal({ isOpen, onClose }: AccountDetailsModalProp
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer — mobile compact */}
         {details && (
-          <div className="px-5 py-4 border-t border-slate-100 shrink-0 flex gap-3">
+          <div className="px-4 sm:px-5 py-3 sm:py-4 border-t border-slate-100 shrink-0 flex gap-2 sm:gap-3">
             <button
               type="button"
               onClick={handleCopyAll}

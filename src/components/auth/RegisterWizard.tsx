@@ -301,7 +301,7 @@ export function RegisterWizard() {
                     <span className="text-xs font-bold text-slate-700">Shop Name</span>
                     <div className="mt-1.5 flex items-center gap-2.5 rounded-xl border border-slate-300 bg-white px-3.5 focus-within:border-slate-900 focus-within:ring-2 focus-within:ring-slate-900/5 transition-all duration-200">
                       <Store className="h-4 w-4 text-slate-400 shrink-0" />
-                      <input name="shopName" type="text" placeholder="e.g. Sharma Building Materials" required value={shopNameInput} onChange={(e) => setShopNameInput(e.target.value)} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]" />
+                      <input name="shopName" type="text" placeholder="e.g. Sharma Building Materials" required value={shopNameInput} onChange={(e) => setShopNameInput(e.target.value)} className="w-full bg-transparent text-base sm:text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]" />
                     </div>
                   </label>
                   <label className="block">
@@ -309,7 +309,7 @@ export function RegisterWizard() {
                     <p className="mt-0.5 text-[11px] text-slate-400 font-medium">This is the unique ID you will use to log in.</p>
                     <div className="mt-1.5 flex items-center gap-2.5 rounded-xl border border-slate-300 bg-white px-3.5 focus-within:border-slate-900 focus-within:ring-2 focus-within:ring-slate-900/5 transition-all duration-200">
                       <Store className="h-4 w-4 text-slate-400 shrink-0" />
-                      <input name="shopCode" type="text" placeholder="e.g. SHARMA-BUILDERS" required value={shopCodeInput} onChange={(e) => setShopCodeInput(e.target.value)} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]" />
+                      <input name="shopCode" type="text" placeholder="e.g. SHARMA-BUILDERS" required value={shopCodeInput} onChange={(e) => setShopCodeInput(e.target.value)} className="w-full bg-transparent text-base sm:text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]" />
                     </div>
                   </label>
                 </>
@@ -319,7 +319,7 @@ export function RegisterWizard() {
                     <span className="text-xs font-bold text-slate-700">Shop ID</span>
                     <div className="mt-1.5 flex items-center gap-2.5 rounded-xl border border-slate-300 bg-white px-3.5 focus-within:border-slate-900 focus-within:ring-2 focus-within:ring-slate-900/5 transition-all duration-200">
                       <Store className="h-4 w-4 text-slate-400 shrink-0" />
-                      <input name="shopCode" type="text" placeholder="e.g. SHARMA-STORE" required value={shopCodeInput} onChange={(e) => setShopCodeInput(e.target.value)} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]" />
+                      <input name="shopCode" type="text" placeholder="e.g. SHARMA-STORE" required value={shopCodeInput} onChange={(e) => setShopCodeInput(e.target.value)} className="w-full bg-transparent text-base sm:text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]" />
                     </div>
                   </label>
                   <label className="block">
@@ -327,7 +327,7 @@ export function RegisterWizard() {
                     <p className="mt-0.5 text-[11px] text-slate-400 font-medium">Ask your shop owner for the invitation code.</p>
                     <div className="mt-1.5 flex items-center gap-2.5 rounded-xl border border-slate-300 bg-white px-3.5 focus-within:border-slate-900 focus-within:ring-2 focus-within:ring-slate-900/5 transition-all duration-200">
                       <Ticket className="h-4 w-4 text-slate-400 shrink-0" />
-                      <input name="invitationCode" type="text" placeholder="e.g. A1B2C3D4" required value={invitationCodeInput} onChange={(e) => setInvitationCodeInput(e.target.value.toUpperCase())} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px] font-mono tracking-wider" />
+                      <input name="invitationCode" type="text" placeholder="e.g. A1B2C3D4" required value={invitationCodeInput} onChange={(e) => setInvitationCodeInput(e.target.value.toUpperCase())} className="w-full bg-transparent text-base sm:text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px] font-mono tracking-wider" />
                     </div>
                   </label>
                 </>
@@ -365,7 +365,7 @@ export function RegisterWizard() {
                 <span className="text-xs font-bold text-slate-700">Full Name</span>
                 <div className="mt-1.5 flex items-center gap-2.5 rounded-xl border border-slate-300 bg-white px-3.5 focus-within:border-slate-900 focus-within:ring-2 focus-within:ring-slate-900/5 transition-all duration-200">
                   <UserRound className="h-4 w-4 text-slate-400 shrink-0" />
-                  <input name="userName" type="text" autoComplete="name" placeholder="e.g. Rahul Sharma" required value={userNameInput} onChange={(e) => setUserNameInput(e.target.value)} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]" />
+                  <input name="userName" type="text" autoComplete="name" placeholder="e.g. Rahul Sharma" required value={userNameInput} onChange={(e) => setUserNameInput(e.target.value)} className="w-full bg-transparent text-base sm:text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]" />
                 </div>
               </label>
               <label className="block">
@@ -373,21 +373,21 @@ export function RegisterWizard() {
                 <p className="mt-0.5 text-[11px] text-slate-400 font-medium">Your personal login ID for this shop.</p>
                 <div className="mt-1.5 flex items-center gap-2.5 rounded-xl border border-slate-300 bg-white px-3.5 focus-within:border-slate-900 focus-within:ring-2 focus-within:ring-slate-900/5 transition-all duration-200">
                   <UserRound className="h-4 w-4 text-slate-400 shrink-0" />
-                  <input name="loginId" type="text" autoComplete="username" placeholder="e.g. rahul" required value={loginIdInput} onChange={(e) => setLoginIdInput(e.target.value)} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]" />
+                  <input name="loginId" type="text" autoComplete="username" placeholder="e.g. rahul" required value={loginIdInput} onChange={(e) => setLoginIdInput(e.target.value)} className="w-full bg-transparent text-base sm:text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]" />
                 </div>
               </label>
               <label className="block">
                 <span className="text-xs font-bold text-slate-700">Email</span>
                 <div className="mt-1.5 flex items-center gap-2.5 rounded-xl border border-slate-300 bg-white px-3.5 focus-within:border-slate-900 focus-within:ring-2 focus-within:ring-slate-900/5 transition-all duration-200">
                   <Mail className="h-4 w-4 text-slate-400 shrink-0" />
-                  <input name="email" type="email" autoComplete="email" placeholder="rahul@example.com" required value={emailInput} onChange={(e) => setEmailInput(e.target.value)} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]" />
+                  <input name="email" type="email" autoComplete="email" placeholder="rahul@example.com" required value={emailInput} onChange={(e) => setEmailInput(e.target.value)} className="w-full bg-transparent text-base sm:text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]" />
                 </div>
               </label>
               <label className="block">
                 <span className="text-xs font-bold text-slate-700">Password</span>
                 <div className="mt-1.5 flex items-center gap-2.5 rounded-xl border border-slate-300 bg-white px-3.5 focus-within:border-slate-900 focus-within:ring-2 focus-within:ring-slate-900/5 transition-all duration-200">
                   <KeyRound className="h-4 w-4 text-slate-400 shrink-0" />
-                  <input name="password" type={showPassword ? "text" : "password"} autoComplete="new-password" minLength={6} required placeholder="Min. 6 characters" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]" />
+                  <input name="password" type={showPassword ? "text" : "password"} autoComplete="new-password" minLength={6} required placeholder="Min. 6 characters" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} className="w-full bg-transparent text-base sm:text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="text-slate-400 hover:text-slate-600 transition-colors shrink-0" tabIndex={-1}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
                 </div>
               </label>
@@ -395,7 +395,7 @@ export function RegisterWizard() {
                 <span className="text-xs font-bold text-slate-700">Confirm Password</span>
                 <div className="mt-1.5 flex items-center gap-2.5 rounded-xl border border-slate-300 bg-white px-3.5 focus-within:border-slate-900 focus-within:ring-2 focus-within:ring-slate-900/5 transition-all duration-200">
                   <KeyRound className="h-4 w-4 text-slate-400 shrink-0" />
-                  <input name="confirmPassword" type={showConfirmPassword ? "text" : "password"} autoComplete="new-password" minLength={6} required placeholder="Re-enter password" value={confirmPasswordInput} onChange={(e) => setConfirmPasswordInput(e.target.value)} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]" />
+                  <input name="confirmPassword" type={showConfirmPassword ? "text" : "password"} autoComplete="new-password" minLength={6} required placeholder="Re-enter password" value={confirmPasswordInput} onChange={(e) => setConfirmPasswordInput(e.target.value)} className="w-full bg-transparent text-base sm:text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]" />
                   <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="text-slate-400 hover:text-slate-600 transition-colors shrink-0" tabIndex={-1}>{showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
                 </div>
               </label>
@@ -430,7 +430,7 @@ export function RegisterWizard() {
                 <span className="text-xs font-bold text-slate-700">Verification Code</span>
                 <div className="mt-1.5 flex items-center gap-2.5 rounded-xl border border-slate-300 bg-white px-3.5 focus-within:border-slate-900 focus-within:ring-2 focus-within:ring-slate-900/5 transition-all duration-200">
                   <ShieldCheck className="h-4 w-4 text-slate-400 shrink-0" />
-                  <input name="otp" type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6} autoComplete="one-time-code" placeholder="000000" required value={otpInputValue} onChange={(e) => setOtpInputValue(e.target.value)} className="w-full bg-transparent text-sm font-black text-slate-900 outline-none tracking-[0.3em] font-mono min-h-[44px]" />
+                  <input name="otp" type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6} autoComplete="one-time-code" placeholder="000000" required value={otpInputValue} onChange={(e) => setOtpInputValue(e.target.value)} className="w-full bg-transparent text-base sm:text-sm font-black text-slate-900 outline-none tracking-[0.3em] font-mono min-h-[44px]" />
                 </div>
               </label>
               {otpError && (

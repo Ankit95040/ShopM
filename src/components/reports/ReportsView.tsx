@@ -87,11 +87,19 @@ export function ReportsView({
   };
 
   return (
-    <div className="p-3 sm:p-6 space-y-4 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
+    <div className="p-3 sm:p-6 space-y-4 max-w-7xl mx-auto min-w-0 overflow-hidden">
+      {/* Header — mobile compact, desktop unchanged */}
+      <div className="sm:hidden">
+        <h1 className="text-[17px] font-black text-slate-900 tracking-tight leading-tight">
+          {t("reportsTitle")}
+        </h1>
+        <p className="text-[11px] text-slate-400 mt-1 font-medium leading-none">
+          {t("reportsSubtitleCompact")}
+        </p>
+      </div>
+      <div className="hidden sm:flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-black text-slate-900 tracking-tight sm:text-2xl">
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
             {t("reportsTitle")}
           </h1>
           <p className="text-[11px] text-slate-500 mt-0.5">
@@ -100,10 +108,92 @@ export function ReportsView({
         </div>
       </div>
 
-      {/* Compact Filters */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-xs">
+      {/* Filters — mobile compact borderless, desktop card */}
+      <div className="sm:hidden space-y-2">
+        <div className="flex gap-2">
+          <div className="relative flex-1 min-w-0">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+            <select
+              value={selectedMonth}
+              onChange={(e) => onMonthChange(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 py-2 text-xs font-bold text-slate-900 focus:border-slate-900 focus:outline-none min-h-[44px] appearance-none"
+            >
+              <option value="all">{t("allTime")}</option>
+              {availableMonths.map((m) => (
+                <option key={m.key} value={m.key}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            <Filter className="absolute right-3 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 pointer-events-none" />
+          </div>
+          {hasActiveFilters && (
+            <button
+              onClick={handleClearFilters}
+              className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition min-h-[44px] whitespace-nowrap"
+            >
+              {t("clearFilters")}
+            </button>
+          )}
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+          <input
+            ref={customerInputRef}
+            type="text"
+            value={isCustomerDropdownOpen ? customerSearch : selectedCustomerName || customerSearch}
+            onChange={(e) => {
+              setCustomerSearch(e.target.value);
+              setIsCustomerDropdownOpen(true);
+            }}
+            onFocus={() => {
+              setIsCustomerDropdownOpen(true);
+              setCustomerSearch("");
+            }}
+            placeholder={t("searchCustomerPlaceholder")}
+            className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-9 py-2.5 text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-none min-h-[44px]"
+          />
+          {(customerSearch || selectedCustomerId !== "all") && (
+            <button
+              onClick={() => {
+                setCustomerSearch("");
+                if (selectedCustomerId !== "all") {
+                  onCustomerChange("all");
+                }
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 flex items-center justify-center rounded-full bg-slate-200 text-slate-500 hover:bg-slate-300 transition"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+          {isCustomerDropdownOpen && (
+            <div className="absolute z-50 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+              <button
+                onClick={() => handleCustomerSelect("all")}
+                className={`w-full px-3 py-2.5 text-left text-xs font-bold transition ${selectedCustomerId === "all" ? "bg-sky-50 text-sky-700" : "text-slate-600 hover:bg-slate-50"}`}
+              >
+                {t("allCustomers")}
+              </button>
+              {filteredCustomers.length > 0 ? (
+                filteredCustomers.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => handleCustomerSelect(c.id)}
+                    className={`w-full px-3 py-2.5 text-left text-xs transition border-t border-slate-100 ${selectedCustomerId === c.id ? "bg-sky-50 text-sky-700" : "text-slate-600 hover:bg-slate-50"}`}
+                  >
+                    <div className="font-bold truncate">{c.name}</div>
+                    <div className="text-[10px] text-slate-400 truncate">{c.locationName}</div>
+                  </button>
+                ))
+              ) : (
+                <div className="px-3 py-3 text-center text-[11px] text-slate-400">{t("noCustomersFound")}</div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="hidden sm:block rounded-2xl border border-slate-200 bg-white p-3 shadow-xs">
         <div className="flex flex-col sm:flex-row gap-2.5">
-          {/* Month Filter */}
           <div className="relative sm:w-48">
             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             <select
@@ -120,12 +210,9 @@ export function ReportsView({
             </select>
             <Filter className="absolute right-3 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 pointer-events-none" />
           </div>
-
-          {/* Customer Search */}
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             <input
-              ref={customerInputRef}
               type="text"
               value={isCustomerDropdownOpen ? customerSearch : selectedCustomerName || customerSearch}
               onChange={(e) => {
@@ -152,17 +239,11 @@ export function ReportsView({
                 <X className="h-3 w-3" />
               </button>
             )}
-
-            {/* Customer Dropdown */}
             {isCustomerDropdownOpen && (
               <div className="absolute z-50 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-lg max-h-48 overflow-y-auto">
                 <button
                   onClick={() => handleCustomerSelect("all")}
-                  className={`w-full px-3 py-2.5 text-left text-xs font-bold transition ${
-                    selectedCustomerId === "all"
-                      ? "bg-sky-50 text-sky-700"
-                      : "text-slate-600 hover:bg-slate-50"
-                  }`}
+                  className={`w-full px-3 py-2.5 text-left text-xs font-bold transition ${selectedCustomerId === "all" ? "bg-sky-50 text-sky-700" : "text-slate-600 hover:bg-slate-50"}`}
                 >
                   {t("allCustomers")}
                 </button>
@@ -171,26 +252,18 @@ export function ReportsView({
                     <button
                       key={c.id}
                       onClick={() => handleCustomerSelect(c.id)}
-                      className={`w-full px-3 py-2.5 text-left text-xs transition border-t border-slate-100 ${
-                        selectedCustomerId === c.id
-                          ? "bg-sky-50 text-sky-700"
-                          : "text-slate-600 hover:bg-slate-50"
-                      }`}
+                      className={`w-full px-3 py-2.5 text-left text-xs transition border-t border-slate-100 ${selectedCustomerId === c.id ? "bg-sky-50 text-sky-700" : "text-slate-600 hover:bg-slate-50"}`}
                     >
                       <div className="font-bold">{c.name}</div>
                       <div className="text-[10px] text-slate-400">{c.locationName}</div>
                     </button>
                   ))
                 ) : (
-                  <div className="px-3 py-3 text-center text-[11px] text-slate-400">
-                    {t("noCustomersFound")}
-                  </div>
+                  <div className="px-3 py-3 text-center text-[11px] text-slate-400">{t("noCustomersFound")}</div>
                 )}
               </div>
             )}
           </div>
-
-          {/* Clear Filters Button */}
           {hasActiveFilters && (
             <button
               onClick={handleClearFilters}
@@ -202,25 +275,31 @@ export function ReportsView({
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex items-center gap-1.5">
+      {/* Tabs — mobile segmented full-width, desktop pill */}
+      <div className="sm:hidden grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
         <button
           onClick={() => setActiveTab("summary")}
-          className={`whitespace-nowrap rounded-xl px-4 py-2 text-xs font-bold transition min-h-[44px] ${
-            activeTab === "summary"
-              ? "bg-slate-900 text-white shadow-xs"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-          }`}
+          className={`rounded-lg px-3 py-2 text-xs font-bold transition min-h-[40px] ${activeTab === "summary" ? "bg-slate-900 text-white shadow-xs" : "text-slate-600"}`}
         >
           {t("financialSummary")}
         </button>
         <button
           onClick={() => setActiveTab("transactions")}
-          className={`whitespace-nowrap rounded-xl px-4 py-2 text-xs font-bold transition min-h-[44px] ${
-            activeTab === "transactions"
-              ? "bg-slate-900 text-white shadow-xs"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-          }`}
+          className={`rounded-lg px-3 py-2 text-xs font-bold transition min-h-[40px] ${activeTab === "transactions" ? "bg-slate-900 text-white shadow-xs" : "text-slate-600"}`}
+        >
+          {t("transactionHistory")}
+        </button>
+      </div>
+      <div className="hidden sm:flex items-center gap-1.5">
+        <button
+          onClick={() => setActiveTab("summary")}
+          className={`whitespace-nowrap rounded-xl px-4 py-2 text-xs font-bold transition min-h-[44px] ${activeTab === "summary" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+        >
+          {t("financialSummary")}
+        </button>
+        <button
+          onClick={() => setActiveTab("transactions")}
+          className={`whitespace-nowrap rounded-xl px-4 py-2 text-xs font-bold transition min-h-[44px] ${activeTab === "transactions" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
         >
           {t("transactionHistory")}
         </button>
@@ -233,8 +312,31 @@ export function ReportsView({
       {/* Financial Summary Tab */}
       {activeTab === "summary" && !isLoading && (
         <div className="space-y-4">
-          {/* Billing Summary Cards */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+          {/* Billing Summary — mobile compact hierarchy, desktop cards */}
+          <div className="sm:hidden">
+            <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.08em]">{t("billingSummary")}</h3>
+            <div className="mt-3 flex items-baseline justify-between border-b border-slate-100 pb-3 min-w-0">
+              <span className="text-xs font-medium text-slate-500">{t("openingBalance")}</span>
+              <span className="text-sm font-bold text-slate-700 break-words text-right min-w-0 ml-3">{formatCurrency(periodReport.openingBalance)}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 pt-3 min-w-0">
+              <div className="min-w-0 text-center">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-tight truncate">{t("billsInPeriod")}</div>
+                <div className="mt-1 text-sm font-black text-red-600 break-words leading-tight">{formatCurrency(periodReport.billsInPeriod)}</div>
+                <div className="mt-0.5 text-[10px] text-slate-400">{periodReport.billCount} {t("billsLabel")}</div>
+              </div>
+              <div className="min-w-0 text-center border-x border-slate-100 px-1">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-tight truncate">{t("paymentsInPeriod")}</div>
+                <div className="mt-1 text-sm font-black text-emerald-600 break-words leading-tight">{formatCurrency(periodReport.paymentsInPeriod)}</div>
+                <div className="mt-0.5 text-[10px] text-slate-400">{periodReport.paymentCount} {t("paymentsLabel")}</div>
+              </div>
+              <div className="min-w-0 text-center">
+                <div className={`text-[10px] font-bold uppercase tracking-wider leading-tight truncate ${periodReport.closingBalance < 0 ? "text-emerald-600" : periodReport.closingBalance > 0 ? "text-red-600" : "text-slate-400"}`}>{periodReport.closingBalance < 0 ? t("advanceCreditBalance") : t("closingOutstanding")}</div>
+                <div className={`mt-1 text-sm font-black break-words leading-tight ${periodReport.closingBalance < 0 ? "text-emerald-600" : periodReport.closingBalance > 0 ? "text-red-600" : "text-slate-900"}`}>{formatCurrency(Math.abs(periodReport.closingBalance))}</div>
+              </div>
+            </div>
+          </div>
+          <div className="hidden sm:block rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
             <h3 className="text-xs font-black text-slate-900 mb-3 uppercase tracking-wider">{t("billingSummary")}</h3>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-xl bg-slate-50 p-3 border border-slate-100">
@@ -278,93 +380,116 @@ export function ReportsView({
             </div>
           </div>
 
-          {/* Customer Outstanding Summary */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+          {/* Customer Outstanding — mobile ledger borderless, desktop table */}
+          <div className="sm:hidden">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-wider">{t("customerOutstandingSummary")}</h3>
+              <span className="text-[10px] font-bold text-slate-400">{t("customersCount", { count: customers.length })}</span>
+            </div>
+            {customers.length > 0 ? (
+              <div className="divide-y divide-slate-100 border-t border-slate-100">
+                {customers.map((cust) => (
+                  <div key={cust.id} className="py-3 flex items-start justify-between gap-3 min-w-0">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-sm text-slate-900 truncate">{cust.name}</div>
+                      <div className="text-[11px] text-slate-500 truncate">{cust.phone} • {cust.locationName}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-slate-500">
+                        <span className="whitespace-nowrap">{t("billsLabel")}: <strong className="text-red-600">{formatCurrency(cust.totalDebt)}</strong></span>
+                        <span className="text-slate-300">•</span>
+                        <span className="whitespace-nowrap">{t("paymentsLabel")}: <strong className="text-emerald-600">{formatCurrency(cust.totalReceived)}</strong></span>
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right min-w-0 ml-2">
+                      <div className={`text-sm font-black break-words ${cust.outstandingBalance < 0 ? "text-emerald-600" : cust.outstandingBalance > 0 ? "text-red-600" : "text-slate-900"}`}>
+                        {formatCurrency(Math.abs(cust.outstandingBalance))}
+                      </div>
+                      <div className="text-[10px] text-slate-400">{cust.outstandingBalance < 0 ? "Advance" : cust.outstandingBalance > 0 ? "Due" : "Clear"}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-slate-400 text-xs">{t("noCustomersFound")}</div>
+            )}
+          </div>
+          <div className="hidden sm:block rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">{t("customerOutstandingSummary")}</h3>
               <span className="text-[10px] font-bold text-slate-400">{t("customersCount", { count: customers.length })}</span>
             </div>
-
-            {/* Desktop: Table */}
-            <div className="hidden sm:block">
-              {customers.length > 0 ? (
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-100">
-                      <th className="text-left py-2 font-bold text-slate-500">{t("customerNameCol")}</th>
-                      <th className="text-left py-2 font-bold text-slate-500">{t("locationShopCol")}</th>
-                      <th className="text-right py-2 font-bold text-slate-500">{t("totalDebtReportCol")}</th>
-                      <th className="text-right py-2 font-bold text-slate-500">{t("totalPaymentsReportCol")}</th>
-                      <th className="text-right py-2 font-bold text-slate-500">{t("netOutstandingCol")}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {customers.map((cust) => (
-                      <tr key={cust.id} className="hover:bg-slate-50/50 transition">
-                        <td className="py-2.5 font-bold text-slate-900">{cust.name}</td>
-                        <td className="py-2.5 text-slate-500">{cust.locationName}</td>
-                        <td className="py-2.5 text-right font-bold text-slate-700">
-                          {formatCurrency(cust.totalDebt)}
-                        </td>
-                        <td className="py-2.5 text-right font-bold text-emerald-600">
-                          {formatCurrency(cust.totalReceived)}
-                        </td>
-                        <td className="py-2.5 text-right">
-                          <span className={`font-black ${cust.outstandingBalance < 0 ? "text-emerald-600" : cust.outstandingBalance > 0 ? "text-red-600" : "text-slate-900"}`}>
-                            {formatCurrency(Math.abs(cust.outstandingBalance))}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="text-center py-6 text-slate-400 text-xs">
-                  {t("noCustomersFound")}
-                </div>
-              )}
-            </div>
-
-            {/* Mobile: Cards */}
-            <div className="sm:hidden space-y-2">
-              {customers.length > 0 ? (
-                customers.map((cust) => (
-                  <div key={cust.id} className="rounded-xl border border-slate-100 p-3">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="min-w-0">
-                        <div className="font-bold text-sm text-slate-900 truncate">{cust.name}</div>
-                        <div className="text-[10px] text-slate-400">{cust.locationName}</div>
-                      </div>
-                      <span className={`text-sm font-black shrink-0 ${cust.outstandingBalance < 0 ? "text-emerald-600" : cust.outstandingBalance > 0 ? "text-red-600" : "text-slate-900"}`}>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="text-left py-2 font-bold text-slate-500">{t("customerNameCol")}</th>
+                  <th className="text-left py-2 font-bold text-slate-500">{t("locationShopCol")}</th>
+                  <th className="text-right py-2 font-bold text-slate-500">{t("totalDebtReportCol")}</th>
+                  <th className="text-right py-2 font-bold text-slate-500">{t("totalPaymentsReportCol")}</th>
+                  <th className="text-right py-2 font-bold text-slate-500">{t("netOutstandingCol")}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {customers.map((cust) => (
+                  <tr key={cust.id} className="hover:bg-slate-50/50 transition">
+                    <td className="py-2.5 font-bold text-slate-900">{cust.name}</td>
+                    <td className="py-2.5 text-slate-500">{cust.locationName}</td>
+                    <td className="py-2.5 text-right font-bold text-slate-700">{formatCurrency(cust.totalDebt)}</td>
+                    <td className="py-2.5 text-right font-bold text-emerald-600">{formatCurrency(cust.totalReceived)}</td>
+                    <td className="py-2.5 text-right">
+                      <span className={`font-black ${cust.outstandingBalance < 0 ? "text-emerald-600" : cust.outstandingBalance > 0 ? "text-red-600" : "text-slate-900"}`}>
                         {formatCurrency(Math.abs(cust.outstandingBalance))}
                       </span>
-                    </div>
-                    <div className="flex items-center gap-3 text-[10px] text-slate-500">
-                      <span>{t("billsLabel")}: <strong className="text-slate-700">{formatCurrency(cust.totalDebt)}</strong></span>
-                      <span>{t("paymentsLabel")}: <strong className="text-emerald-600">{formatCurrency(cust.totalReceived)}</strong></span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-6 text-slate-400 text-xs">
-                  {t("noCustomersFound")}
-                </div>
-              )}
-            </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {customers.length === 0 && (
+              <div className="text-center py-6 text-slate-400 text-xs">{t("noCustomersFound")}</div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Transaction History Tab */}
+      {/* Transaction History — mobile ledger borderless, desktop table */}
       {activeTab === "transactions" && !isLoading && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">{t("allTransactions")}</h3>
-            <span className="text-[10px] font-bold text-slate-400">{t("transactionsCount", { count: transactions.length })}</span>
+        <>
+          <div className="sm:hidden">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-wider">{t("allTransactions")}</h3>
+              <span className="text-[10px] font-bold text-slate-400">{t("transactionsCount", { count: transactions.length })}</span>
+            </div>
+            {transactions.length > 0 ? (
+              <div className="divide-y divide-slate-100 border-t border-slate-100">
+                {transactions.map((tx) => (
+                  <div key={tx.id} className="py-3 flex items-start justify-between gap-3 min-w-0">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-sm text-slate-900 truncate">{tx.customerName}</div>
+                      <div className="text-[11px] text-slate-500 truncate">{tx.locationName}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px]">
+                        <span className={`rounded-md px-1.5 py-0.5 font-bold leading-none ${tx.type === "DEBT" ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}>{tx.type === "DEBT" ? t("billLabel") : t("paymentLabel")}</span>
+                        <span className="text-slate-400">{formatDate(tx.transactionDate, "dd MMM • hh:mm a")}</span>
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right min-w-0 ml-2 flex flex-col items-end gap-1">
+                      <span className={`text-sm font-black break-words ${tx.type === "DEBT" ? "text-red-600" : "text-emerald-600"}`}>{tx.type === "DEBT" ? "+" : "-"}{formatCurrency(tx.amount)}</span>
+                      {tx.billImageKey && (
+                        <button onClick={() => handleViewBillImage(tx)} className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition" title={t("viewBillImage")} aria-label={t("viewBillImage")}>
+                          <FileText className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-slate-400 text-xs">{t("noTransactionsFound")}</div>
+            )}
           </div>
-
-          {/* Desktop: Table */}
-          <div className="hidden sm:block">
+          <div className="hidden sm:block rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">{t("allTransactions")}</h3>
+              <span className="text-[10px] font-bold text-slate-400">{t("transactionsCount", { count: transactions.length })}</span>
+            </div>
             {transactions.length > 0 ? (
               <table className="w-full text-xs">
                 <thead>
@@ -381,40 +506,17 @@ export function ReportsView({
                 <tbody className="divide-y divide-slate-50">
                   {transactions.map((tx) => (
                     <tr key={tx.id} className="hover:bg-slate-50/50 transition">
-                      <td className="py-2.5 text-slate-600 whitespace-nowrap">
-                        {formatDate(tx.transactionDate, "dd MMM, hh:mm a")}
-                      </td>
-                      <td className="py-2.5">
-                        <div className="font-bold text-slate-900">{tx.customerName}</div>
-                      </td>
+                      <td className="py-2.5 text-slate-600 whitespace-nowrap">{formatDate(tx.transactionDate, "dd MMM, hh:mm a")}</td>
+                      <td className="py-2.5"><div className="font-bold text-slate-900">{tx.customerName}</div></td>
                       <td className="py-2.5 text-slate-500 hidden md:table-cell">{tx.locationName}</td>
                       <td className="py-2.5 text-center">
-                        <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                          tx.type === "DEBT"
-                            ? "bg-red-100 text-red-600"
-                            : "bg-emerald-100 text-emerald-600"
-                        }`}>
-                          {tx.type === "DEBT" ? t("billLabel") : t("paymentLabel")}
-                        </span>
+                        <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${tx.type === "DEBT" ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}>{tx.type === "DEBT" ? t("billLabel") : t("paymentLabel")}</span>
                       </td>
-                      <td className="py-2.5 text-right">
-                        <span className={`font-black ${
-                          tx.type === "DEBT" ? "text-red-600" : "text-emerald-600"
-                        }`}>
-                          {tx.type === "DEBT" ? "+" : "-"}{formatCurrency(tx.amount)}
-                        </span>
-                      </td>
-                      <td className="py-2.5 text-slate-500 text-[11px] hidden lg:table-cell">
-                        {tx.billNumber || tx.paymentMethod || tx.description || "-"}
-                      </td>
+                      <td className="py-2.5 text-right"><span className={`font-black ${tx.type === "DEBT" ? "text-red-600" : "text-emerald-600"}`}>{tx.type === "DEBT" ? "+" : "-"}{formatCurrency(tx.amount)}</span></td>
+                      <td className="py-2.5 text-slate-500 text-[11px] hidden lg:table-cell">{tx.billNumber || tx.paymentMethod || tx.description || "-"}</td>
                       <td className="py-2.5">
                         {tx.billImageKey && (
-                          <button
-                            onClick={() => handleViewBillImage(tx)}
-                            className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition"
-                            title={t("viewBillImage")}
-                            aria-label={t("viewBillImage")}
-                          >
+                          <button onClick={() => handleViewBillImage(tx)} className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition" title={t("viewBillImage")} aria-label={t("viewBillImage")}>
                             <FileText className="h-3.5 w-3.5" />
                           </button>
                         )}
@@ -424,57 +526,10 @@ export function ReportsView({
                 </tbody>
               </table>
             ) : (
-              <div className="text-center py-6 text-slate-400 text-xs">
-                {t("noTransactionsFound")}
-              </div>
+              <div className="text-center py-6 text-slate-400 text-xs">{t("noTransactionsFound")}</div>
             )}
           </div>
-
-          {/* Mobile: Cards */}
-          <div className="sm:hidden space-y-2">
-            {transactions.length > 0 ? (
-              transactions.map((tx) => (
-                <div key={tx.id} className="rounded-xl border border-slate-100 p-3">
-                  <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <div className="min-w-0">
-                      <div className="font-bold text-sm text-slate-900 truncate">{tx.customerName}</div>
-                      <div className="text-[10px] text-slate-400">
-                        {formatDate(tx.transactionDate, "dd MMM yyyy \u2022 h:mm a")}
-                      </div>
-                    </div>
-                    <span className={`text-sm font-black shrink-0 ${tx.type === "DEBT" ? "text-red-600" : "text-emerald-600"}`}>
-                      {tx.type === "DEBT" ? "+" : "-"}{formatCurrency(tx.amount)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                      tx.type === "DEBT"
-                        ? "bg-red-100 text-red-600"
-                        : "bg-emerald-100 text-emerald-600"
-                    }`}>
-                      {tx.type === "DEBT" ? t("billLabel") : t("paymentLabel")}
-                    </span>
-                    {tx.billImageKey && (
-                      <button
-                        onClick={() => handleViewBillImage(tx)}
-                        className="flex min-h-[44px] items-center gap-1 rounded-lg bg-sky-50 px-2.5 text-[10px] font-bold text-sky-600 hover:bg-sky-100 transition"
-                        title={t("viewBillImage")}
-                        aria-label={t("viewBillImage")}
-                      >
-                        <FileText className="h-3 w-3" />
-                        {t("viewBillImage")}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-6 text-slate-400 text-xs">
-                {t("noTransactionsFound")}
-              </div>
-            )}
-          </div>
-        </div>
+        </>
       )}
 
       {/* Bill Image Viewer */}

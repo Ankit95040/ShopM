@@ -96,7 +96,7 @@ export function LoginForm() {
                     type="text"
                     autoComplete="organization"
                     placeholder="e.g. SHARMA-STORE"
-                    className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]"
+                    className="w-full bg-transparent text-base sm:text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]"
                   />
                 </div>
               </label>
@@ -111,7 +111,7 @@ export function LoginForm() {
                     type="text"
                     autoComplete="username"
                     placeholder="e.g. rahul"
-                    className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]"
+                    className="w-full bg-transparent text-base sm:text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]"
                   />
                 </div>
               </label>
@@ -134,7 +134,7 @@ export function LoginForm() {
                     type="password"
                     autoComplete="current-password"
                     placeholder="Enter your password"
-                    className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]"
+                    className="w-full bg-transparent text-base sm:text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 min-h-[44px]"
                   />
                 </div>
               </label>
